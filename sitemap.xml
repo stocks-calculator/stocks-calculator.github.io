@@ -1,16 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://example.com/index.html</loc>
+    <loc>https://stocks-calculator.github.io/</loc>
+    <lastmod>2026-07-20</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
-  <!--
-  향후 탭이 별도 서버사이드 경로로 분리될 경우 아래처럼 항목을 추가하세요.
   <url>
-    <loc>https://example.com/tab2.html</loc>
+    <loc>https://stocks-calculator.github.io/pages/disclaimer.html</loc>
+    <lastmod>2026-07-20</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
+    <priority>0.3</priority>
   </url>
-  -->
 </urlset>
