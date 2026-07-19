@@ -4,7 +4,7 @@
 
 const TABS = [
   { id: 'calculator', name: '레버리지 계산기', html: './assets/calculator.html', js: './assets/calculator.js', enabled: true },
-  { id: 'disclaimer', label: '이용약관/면책조항', html: './pages/tab2.html', init: initTab2 }
+  { id: 'disclaimer', name: '이용약관/면책조항', html: './pages/tab2.html', js: './pages/tab2.js', enabled: true }
 ];
 
 function loadScriptOnce(src){
