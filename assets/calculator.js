@@ -56,6 +56,7 @@ function addDayRow(defaultVal){
   `;
   tbody.appendChild(tr);
   recalcAllRows();
+  updateScrollIndicator();
 }
 
 function removeRow(id){
@@ -63,6 +64,7 @@ function removeRow(id){
   if(row) row.remove();
   renumberRows();
   recalcAllRows();
+  updateScrollIndicator();
 }
 
 function renumberRows(){
@@ -70,6 +72,19 @@ function renumberRows(){
   Array.from(tbody.children).forEach((tr, i) => {
     tr.children[0].textContent = (i+1) + '일차';
   });
+}
+
+function updateScrollIndicator(){
+  const wrap = document.getElementById('dayTableWrap');
+  const container = document.getElementById('tableScrollContainer');
+  if(!wrap || !container) return;
+  const maxScroll = wrap.scrollWidth - wrap.clientWidth;
+  if(maxScroll <= 0){
+    container.classList.remove('scrolled-left', 'scrolled-right');
+    return;
+  }
+  container.classList.toggle('scrolled-left', wrap.scrollLeft > 5);
+  container.classList.toggle('scrolled-right', wrap.scrollLeft < maxScroll - 5);
 }
 
 function recalcAllRows(){
@@ -223,3 +238,10 @@ function exportExcel(){
 addDayRow(2);
 addDayRow(-1);
 addDayRow(3);
+
+const dayTableWrapEl = document.getElementById('dayTableWrap');
+if(dayTableWrapEl){
+  dayTableWrapEl.addEventListener('scroll', updateScrollIndicator);
+}
+window.addEventListener('resize', updateScrollIndicator);
+updateScrollIndicator();
