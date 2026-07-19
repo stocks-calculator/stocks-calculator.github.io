@@ -1,0 +1,129 @@
+* { box-sizing: border-box; }
+
+  :root {
+    --bg: #0f1117;
+    --card-bg: #1a1d27;
+    --text: #eee;
+    --subtext: #999;
+    --border: #333;
+    --input-bg: #0f1117;
+    --th-bg: #20242f;
+    --note-bg: #12141c;
+    --accent: #4fc3f7;
+    --accent-text: #000;
+    --pos: #4caf50;
+    --neg: #f44336;
+    --decay-bg: #2a1b1b;
+    --decay-border: #ff7043;
+    --del-bg: #3a1b1b;
+    --del-text: #ef9a9a;
+    --add-bg: #2e3a44;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f6fa;
+      --card-bg: #ffffff;
+      --text: #1a1d27;
+      --subtext: #666;
+      --border: #d8dce3;
+      --input-bg: #ffffff;
+      --th-bg: #eef2f7;
+      --note-bg: #eef2f7;
+      --accent: #0288d1;
+      --accent-text: #fff;
+      --pos: #2e7d32;
+      --neg: #c62828;
+      --decay-bg: #fdecea;
+      --decay-border: #e64a19;
+      --del-bg: #fdecea;
+      --del-text: #c62828;
+      --add-bg: #e3f2fd;
+    }
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    padding:16px;
+    max-width:900px;
+    margin:auto;
+    font-size:15px;
+    transition: background 0.2s, color 0.2s;
+  }
+  h1 { color:var(--accent); font-size:20px; margin-bottom:4px;}
+  h3 { color:var(--accent); font-size:16px; margin-top:20px;}
+  .subtitle { color:var(--subtext); font-size:13px; margin-bottom:16px; }
+  .card { background:var(--card-bg); padding:18px; border-radius:14px; margin-bottom:16px; box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+  .section-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;}
+  label { display:block; margin-top:12px; font-size:13.5px; color:var(--subtext);}
+  input, select {
+    padding:10px; border-radius:8px; border:1px solid var(--border);
+    background:var(--input-bg); color:var(--text); font-size:15px; -webkit-appearance:none;
+  }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .leverage-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .leverage-row > div { flex:1; min-width:130px; }
+  .leverage-row input, .leverage-row select { width:100%; }
+  .grid2 input { width:100%; }
+
+  .day-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:14px; }
+  .day-table { width:100%; border-collapse:collapse; min-width:560px; }
+  .day-table th, .day-table td { border:1px solid var(--border); padding:8px; text-align:center; font-size:13px; }
+  .day-table th { background:var(--th-bg); }
+  .day-table input.dayReturnInput {
+    width:90px; text-align:right; padding:6px; font-size:13px; margin:0;
+  }
+  .day-table .val-pos { color:var(--pos); font-weight:bold; }
+  .day-table .val-neg { color:var(--neg); font-weight:bold; }
+  .del-btn {
+    background:var(--del-bg); color:var(--del-text); border:none; border-radius:6px;
+    padding:6px 10px; font-size:12px; cursor:pointer;
+  }
+
+  button.calc-btn {
+    margin-top:14px; padding:14px; background:var(--accent); color:var(--accent-text); border:none; border-radius:10px;
+    font-weight:bold; cursor:pointer; font-size:15px; width:100%;
+  }
+  button.add-btn {
+    margin-top:12px; padding:12px; background:var(--add-bg); color:var(--accent); border:1px dashed var(--accent);
+    border-radius:10px; font-weight:bold; cursor:pointer; font-size:14px; width:100%;
+  }
+  button.reset-btn {
+    padding:8px 14px; background:transparent; color:var(--neg); border:1px solid var(--neg);
+    border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;
+  }
+  button.excel-btn {
+    margin-top:10px; padding:14px; background:#2e7d32; color:#fff; border:none; border-radius:10px;
+    font-weight:bold; cursor:pointer; font-size:15px; width:100%;
+  }
+  button:active { opacity:0.8; }
+
+  .result { font-size:14.5px; margin-top:8px; line-height:1.6;}
+  .pos { color:var(--pos); font-weight:bold;}
+  .neg { color:var(--neg); font-weight:bold;}
+  .note { font-size:12px; color:var(--subtext); margin-top:14px; line-height:1.8; background:var(--note-bg); padding:12px; border-radius:8px; border-left:3px solid var(--accent);}
+  .formula { font-family:'Consolas', monospace; color:#e6a817; background:rgba(0,0,0,0.08); padding:2px 5px; border-radius:4px; word-break:break-all; font-size:11.5px;}
+  .decay-box { background:var(--decay-bg); border-left:3px solid var(--decay-border); padding:14px; margin-top:14px; border-radius:8px; }
+  .summary-table { width:100%; border-collapse:collapse; margin-top:14px; }
+  .summary-table th, .summary-table td { border:1px solid var(--border); padding:8px 10px; text-align:right; font-size:13px;}
+  .summary-table th { background:var(--th-bg); text-align:center;}
+  .summary-table td:first-child, .summary-table th:first-child { text-align:left; }
+  .ad-slot { width:100%; text-align:center; margin:14px 0; }
+  .api-note { font-size:12px; color:var(--subtext); }
+
+  @media (max-width: 480px) {
+    body { padding:10px; font-size:14px; }
+    h1 { font-size:17px; }
+    .card { padding:14px; border-radius:10px; }
+    .grid2 { grid-template-columns:1fr; }
+    .day-table th, .day-table td { font-size:11.5px; padding:6px; }
+    .day-table input.dayReturnInput { width:70px; font-size:12px; }
+  }
+
+/* ===== 탭 바 스타일 ===== */
+.tab-bar { display:flex; gap:8px; margin-bottom:16px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.tab-btn { padding:10px 16px; border:1px solid var(--border); background:var(--card-bg); color:var(--subtext); border-radius:10px 10px 0 0; font-weight:bold; font-size:14px; cursor:pointer; white-space:nowrap; transition: background 0.15s, color 0.15s; }
+.tab-btn.active { background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+.tab-btn:hover:not(.active) { background:var(--th-bg); }

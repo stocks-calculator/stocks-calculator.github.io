@@ -1,0 +1,68 @@
+<!--
+[레버리지 계산기 UI - loader.js가 #tab-content에 주입]
+-->
+<h1>레버리지 손익 시뮬레이션 계산기</h1>
+<p class="subtitle">기초자산의 일별 수익률을 하루씩 추가 입력하면, 매일 복리로 누적한 실제 레버리지 손익과 변동성 끌림(Decay)을 계산합니다.</p>
+
+<div class="card">
+  <div class="section-header">
+    <h3 style="margin-top:0;">1. 레버리지 배수 및 투자 정보</h3>
+    <button class="reset-btn" onclick="resetAll()">초기화</button>
+  </div>
+  <div class="leverage-row">
+    <div>
+      <label>레버리지 배수 선택</label>
+      <select id="leverageSelect" onchange="syncLeverage('select')">
+        <option value="2" selected>2x</option>
+        <option value="3">3x</option>
+        <option value="custom">직접 입력</option>
+      </select>
+    </div>
+    <div id="customLeverageWrap" style="display:none;">
+      <label>배수 직접 입력</label>
+      <input type="number" id="leverageCustom" value="2" step="0.1" oninput="syncLeverage('input')">
+    </div>
+  </div>
+  <div class="grid2">
+    <div>
+      <label>투자 원금 (원)</label>
+      <input type="text" id="principal" value="1,500,000" inputmode="numeric" oninput="formatPrincipal()">
+    </div>
+    <div>
+      <label>연 운용 보수 (%, 미입력 시 0으로 계산)</label>
+      <input type="number" id="fee" value="0" step="0.01">
+    </div>
+  </div>
+
+  <h3>2. 기초자산 일별 수익률 입력</h3>
+  <div class="day-table-wrap">
+    <table class="day-table" id="dayTable">
+      <thead>
+        <tr>
+          <th>구분</th>
+          <th>일 수익률 (%)</th>
+          <th>기초자산 가치</th>
+          <th>레버리지 가치</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="dayTableBody"></tbody>
+    </table>
+  </div>
+  <button class="add-btn" onclick="addDayRow()">+ 일자 추가</button>
+
+  <button class="calc-btn" onclick="calcSimulation()">시뮬레이션 계산하기</button>
+  <button class="excel-btn" onclick="exportExcel()">엑셀로 저장하기</button>
+  <div id="simResult"></div>
+</div>
+
+<div class="note">
+  <b>계산식 (매일 복리 누적)</b><br>
+  매일 레버리지 가치 갱신 = <span class="formula">전일 가치 × (1 + 당일 기초자산 수익률 × 배수 − 일일보수)</span><br>
+  기초자산 총 수익률 = <span class="formula">(최종 지수가 − 최초 지수가) / 최초 지수가 × 100</span><br>
+  단순 예상 수익률(오해하기 쉬운 값) = <span class="formula">기초자산 총 수익률 × 배수</span><br>
+  실제 시뮬레이션 수익률 = <span class="formula">매일 복리로 누적한 최종 결과</span><br>
+  변동성 끌림(Decay) = <span class="formula">단순 예상 수익률 − 실제 시뮬레이션 수익률</span><br><br>
+  ※ 연 운용 보수를 입력하지 않으면 자동으로 0%로 계산됩니다. 일자를 추가할 때마다 그 줄의 기초자산 가치와 레버리지 가치가 즉시 계산되어 우측에 표시됩니다.
+</div>
+<div id="ad-mid-slot"></div>
