@@ -50,15 +50,36 @@ function buildTabBar(container){
   container.appendChild(bar);
 }
 
+const loadedTabs = new Set();
+
 async function activateTab(tabId){
   const tab = TABS.find(t => t.id === tabId && t.enabled);
   if(!tab) return;
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tabId === tabId);
   });
+
   const contentEl = document.getElementById('tab-content');
-  contentEl.innerHTML = await fetchText(tab.html);
-  await loadScriptOnce(tab.js);
+
+  TABS.filter(t => t.enabled).forEach(t => {
+    const pane = document.getElementById('tab-pane-' + t.id);
+    if(pane) pane.style.display = (t.id === tabId) ? 'block' : 'none';
+  });
+
+  let pane = document.getElementById('tab-pane-' + tabId);
+  if(!pane){
+    pane = document.createElement('div');
+    pane.id = 'tab-pane-' + tabId;
+    contentEl.appendChild(pane);
+  }
+
+  if(!loadedTabs.has(tabId)){
+    pane.innerHTML = await fetchText(tab.html);
+    await loadScriptOnce(tab.js);
+    loadedTabs.add(tabId);
+  }
+
+  pane.style.display = 'block';
 }
 
 async function injectAdsense(){
