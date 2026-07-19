@@ -34,8 +34,9 @@
     </div>
   </div>
 
-  <h3>2. 기초자산 일별 수익률 입력</h3>
-  <div class="day-table-wrap">
+<h3>2. 기초자산 일별 수익률 입력</h3>
+<div class="table-scroll-container" id="tableScrollContainer">
+  <div class="day-table-wrap" id="dayTableWrap">
     <table class="day-table" id="dayTable">
       <thead>
         <tr>
@@ -49,7 +50,8 @@
       <tbody id="dayTableBody"></tbody>
     </table>
   </div>
-  <button class="add-btn" onclick="addDayRow()">+ 일자 추가</button>
+</div>
+<button class="add-btn" onclick="addDayRow()">+ 일자 추가</button>
 
   <button class="calc-btn" onclick="calcSimulation()">시뮬레이션 계산하기</button>
   <button class="excel-btn" onclick="exportExcel()">엑셀로 저장하기</button>
