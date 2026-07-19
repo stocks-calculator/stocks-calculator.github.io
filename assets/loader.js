@@ -4,9 +4,7 @@
 
 const TABS = [
   { id: 'calculator', name: '레버리지 계산기', html: './assets/calculator.html', js: './assets/calculator.js', enabled: true },
-
-  // ▼▼▼ 신규 서비스 탭 자리 (구상 미완료 상태이므로 비활성화) ▼▼▼
-  // { id: 'tab2', name: '준비중 서비스', html: './pages/tab2.html', js: './pages/tab2.js', enabled: false },
+  { id: 'disclaimer', label: '이용약관/면책조항', html: './pages/tab2.html', init: initTab2 }
 ];
 
 function loadScriptOnce(src){
