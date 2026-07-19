@@ -69,6 +69,40 @@
   .grid2 input { width:100%; }
 
   .day-table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:14px; }
+.table-scroll-container {
+  position: relative;
+}
+
+.table-scroll-container::before,
+.table-scroll-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.table-scroll-container::before {
+  left: 0;
+  background: linear-gradient(to right, var(--card-bg), transparent);
+}
+
+.table-scroll-container::after {
+  right: 0;
+  background: linear-gradient(to left, var(--card-bg), transparent);
+}
+
+.table-scroll-container.scrolled-left::before {
+  opacity: 1;
+}
+
+.table-scroll-container.scrolled-right::after {
+  opacity: 1;
+}
   .day-table { width:100%; border-collapse:collapse; min-width:560px; }
   .day-table th, .day-table td { border:1px solid var(--border); padding:8px; text-align:center; font-size:13px; }
   .day-table th { background:var(--th-bg); }
