@@ -46,8 +46,9 @@ function addDayRow(defaultVal){
   const tbody = document.getElementById('dayTableBody');
   const tr = document.createElement('tr');
   tr.id = 'row-' + dayCount;
+  const displayNum = tbody.children.length + 1;
   tr.innerHTML = `
-    <td>${dayCount}일차</td>
+    <td>${displayNum}일차</td>
     <td><input type="number" class="dayReturnInput" step="0.01" value="${defaultVal!==undefined?defaultVal:''}" oninput="recalcAllRows()" placeholder="예: 1.5"></td>
     <td class="underlyingCell">-</td>
     <td class="leveragedCell">-</td>
