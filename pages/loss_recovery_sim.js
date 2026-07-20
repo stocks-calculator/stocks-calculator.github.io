@@ -74,11 +74,7 @@ function renderSimTable(){
   const principal = buyPrice * shares;
 
   document.getElementById('simEtfRateHeader').textContent = `ETF 등락률(${leverage}배)(%)`;
-  document.getElementById('simPrincipalBox').innerHTML = `
-    <table class="summary-table">
-      <tr><td>원금 (자동 계산)</td><td class="pos">${principal.toLocaleString('ko-KR')} 원</td></tr>
-    </table>
-  `;
+  document.getElementById('simPrincipalBox').value = `${principal.toLocaleString('ko-KR')} 원`;
 
   let prevClose = buyPrice;
   let etfPrice = buyPrice;
