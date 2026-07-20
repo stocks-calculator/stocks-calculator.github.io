@@ -75,7 +75,6 @@
   표의 7개 값(기초자산 증가, 기초자산 등락률, ETF 등락률, ETF 주당 가격, 평가금액, 손익, 손익률) 중 어느 칸이든 값을 입력하면 나머지 값이 실시간으로 자동 계산됩니다.
 </div>
 
-report_section = '''
 <div class="card">
   <div class="section-header">
     <h3>3. 시뮬레이션 리포트</h3>
@@ -89,11 +88,3 @@ report_section = '''
   </div>
 </div>
 
-'''
-
-new_html = h.replace('<div class="note">', report_section + '<div class="note">')
-
-with open('output/loss_recovery_sim.html', 'w', encoding='utf-8') as f:
-    f.write(new_html)
-
-print(new_html)
