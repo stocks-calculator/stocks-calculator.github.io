@@ -31,6 +31,9 @@
     </div>
   </div>
 
+  <label>연 운용 보수 (%, 미입력 시 0으로 계산)</label>
+  <input type="text" id="simFeeRate" inputmode="decimal" placeholder="예: 0.7" oninput="onSimNumInput(this); recalcSim()">
+
   <label>원금 (자동 계산)</label>
   <input type="text" id="simPrincipalBox" readonly>
 </div>
