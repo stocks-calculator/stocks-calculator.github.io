@@ -74,3 +74,26 @@
   ETF는 매일 리밸런싱하므로, 기초자산이 등락을 반복하면 레버리지 ETF는 원금 회복이 더 어려워지는 "감쇠 효과"가 발생합니다.<br>
   표의 7개 값(기초자산 증가, 기초자산 등락률, ETF 등락률, ETF 주당 가격, 평가금액, 손익, 손익률) 중 어느 칸이든 값을 입력하면 나머지 값이 실시간으로 자동 계산됩니다.
 </div>
+
+report_section = '''
+<div class="card">
+  <div class="section-header">
+    <h3>3. 시뮬레이션 리포트</h3>
+    <div class="section-header-actions">
+      <button class="add-btn" onclick="generateSimReport()">리포트 생성</button>
+      <button class="excel-btn" onclick="downloadSimReport()">리포트 다운로드</button>
+    </div>
+  </div>
+  <div id="simReportBox" class="report-box">
+    <p class="report-empty">기본 설정과 일자별 시뮬레이션 데이터를 입력한 뒤 "리포트 생성" 버튼을 눌러주세요.</p>
+  </div>
+</div>
+
+'''
+
+new_html = h.replace('<div class="note">', report_section + '<div class="note">')
+
+with open('output/loss_recovery_sim.html', 'w', encoding='utf-8') as f:
+    f.write(new_html)
+
+print(new_html)
