@@ -45,6 +45,7 @@ function resetSim(){
   document.getElementById('simLeverageSel').value = '2';
   document.getElementById('simLeverageCustom').value = '';
   document.getElementById('simCustomLeverageWrap').style.display = 'none';
+  document.getElementById('simFeeRate').value = '';
   addSimRow();
   addSimRow();
   addSimRow();
