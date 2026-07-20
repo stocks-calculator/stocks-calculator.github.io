@@ -198,3 +198,82 @@
   text-align: right;
   margin-top: 32px;
 }
+
+/* ===== 시뮬레이션 리포트 스타일 ===== */
+.section-header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.section-header-actions button {
+  margin-top: 0;
+  width: auto;
+}
+.section-header-actions button.add-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+}
+.section-header-actions button.excel-btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  width: auto;
+}
+
+.report-box {
+  margin-top: 14px;
+}
+
+.report-empty {
+  font-size: 13.5px;
+  color: var(--subtext);
+  text-align: center;
+  padding: 20px 10px;
+}
+
+.report-summary h4 {
+  color: var(--accent);
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+.report-table td {
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.report-table td:first-child {
+  color: var(--subtext);
+  width: 55%;
+}
+.report-table td:last-child {
+  text-align: right;
+  font-weight: bold;
+}
+.report-table .val-pos { color: var(--pos); }
+.report-table .val-neg { color: var(--neg); }
+
+.report-narrative {
+  background: var(--decay-bg);
+  border-left: 3px solid var(--decay-border);
+  padding: 14px;
+  border-radius: 8px;
+}
+.report-narrative p {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.report-narrative p:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 480px) {
+  .report-table td { font-size: 12px; padding: 6px 8px; }
+  .report-narrative p { font-size: 12.5px; }
+}
