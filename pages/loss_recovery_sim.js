@@ -71,11 +71,9 @@ function renderSimTable(){
   const buyPrice = parseNum(document.getElementById('simBuyPrice').value);
   const shares = parseNum(document.getElementById('simShares').value);
   const leverage = getSimLeverage();
+  const dailyFee = getSimDailyFee();
   const principal = buyPrice * shares;
-
-  document.getElementById('simEtfRateHeader').textContent = `ETF 등락률(${leverage}배)(%)`;
-  document.getElementById('simPrincipalBox').value = `${principal.toLocaleString('ko-KR')} 원`;
-
+  ...
   let prevClose = buyPrice;
   let etfPrice = buyPrice;
 
@@ -97,7 +95,7 @@ function renderSimTable(){
         row.underlyingRate = 0;
         row.etfRate = 0;
       }
-      etfPrice = etfPrice * (1 + (row.etfRate || 0)/100);
+      etfPrice = etfPrice * (1 + (row.etfRate || 0)/100 - dailyFee);
     }
     row._etfPrice = etfPrice;
     prevClose = row.closePrice;
