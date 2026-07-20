@@ -1,0 +1,73 @@
+<!--
+[레버리지 ETF 손실/복구 시뮬레이터 - loader.js가 #tab-content에 주입]
+-->
+<h1>레버리지 ETF 손실 / 복구 시뮬레이터</h1>
+<p class="subtitle">매수가·주식수·배율을 입력한 뒤, 각 일차의 기초자산 종가 또는 ETF 등락률 중 하나만 입력하면 나머지가 자동 계산됩니다.</p>
+
+<div class="card">
+  <div class="grid2">
+    <div>
+      <label>매수가 (원)</label>
+      <input type="text" id="simBuyPrice" inputmode="decimal" placeholder="예: 10,000" oninput="onSimNumInput(this); recalcSim()">
+    </div>
+    <div>
+      <label>주식 수</label>
+      <input type="text" id="simShares" inputmode="decimal" placeholder="예: 100" oninput="onSimNumInput(this); recalcSim()">
+    </div>
+  </div>
+
+  <label>레버리지 배율</label>
+  <div class="leverage-row">
+    <div>
+      <select id="simLeverageSel" onchange="onLeverageSelChange()">
+        <option value="2" selected>2배</option>
+        <option value="3">3배</option>
+        <option value="custom">직접 입력</option>
+      </select>
+    </div>
+    <div id="simCustomLeverageWrap" style="display:none;">
+      <input type="text" id="simLeverageCustom" placeholder="배율 직접 입력" oninput="onSimNumInput(this); recalcSim()">
+    </div>
+  </div>
+
+  <div id="simPrincipalBox" class="result"></div>
+</div>
+
+<div class="card">
+  <div class="section-header">
+    <h3>일차별 시뮬레이션</h3>
+  </div>
+
+  <div class="table-scroll-container">
+    <div class="day-table-wrap">
+      <table class="day-table">
+        <thead>
+          <tr>
+            <th>시점</th>
+            <th>기초자산 종가(원)</th>
+            <th>기초자산 등락률(%)</th>
+            <th id="simEtfRateHeader">ETF 등락률(2배)(%)</th>
+            <th>ETF 주당 가격(원)</th>
+            <th>평가금액(원)</th>
+            <th>손익(원)</th>
+            <th>손익률(%)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="simTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <button class="add-btn" onclick="addSimRow()">+ 일차 추가</button>
+  <button class="reset-btn" onclick="resetSim()" style="margin-top:10px; width:100%;">초기화</button>
+  <button class="excel-btn" onclick="exportSimExcel()">엑셀로 저장하기</button>
+</div>
+
+<div class="note">
+  · 각 행은 기초자산 종가 또는 ETF 등락률 중 하나에만 입력하세요. 나중에 입력한 값이 우선 적용됩니다.<br>
+  · 기초자산 종가 입력 시: <span class="formula">등락률 × 배율 = ETF 등락률</span>로 계산됩니다.<br>
+  · ETF 등락률을 직접 입력한 경우: 그 값이 실제 수익률로 그대로 반영되며, 배율은 기초자산 등락률을 역산하는 데만 쓰입니다.<br>
+  · 0일차(매수 시)는 종가 = 매수가, 등락률 = 0%로 고정됩니다.<br>
+  · 본 시뮬레이터는 정보 제공 목적의 도구이며, 투자 조언이 아닙니다. 자세한 내용은 상단 "이용약관/면책조항"을 참고하세요.
+</div>
