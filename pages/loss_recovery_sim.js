@@ -21,6 +21,12 @@ function getSimLeverage(){
   return parseFloat(sel);
 }
 
+function getSimDailyFee(){
+  const el = document.getElementById('simFeeRate');
+  const annualFee = el ? parseNum(el.value) : 0;
+  return (annualFee / 100) / 365;
+}
+
 function onLeverageSelChange(){
   const sel = document.getElementById('simLeverageSel').value;
   document.getElementById('simCustomLeverageWrap').style.display = (sel === 'custom') ? 'block' : 'none';
@@ -45,7 +51,8 @@ function resetSim(){
   document.getElementById('simLeverageSel').value = '2';
   document.getElementById('simLeverageCustom').value = '';
   document.getElementById('simCustomLeverageWrap').style.display = 'none';
-  document.getElementById('simFeeRate').value = '';
+  const feeEl = document.getElementById('simFeeRate');
+  if(feeEl) feeEl.value = '';
   addSimRow();
   addSimRow();
   addSimRow();
@@ -74,7 +81,10 @@ function renderSimTable(){
   const leverage = getSimLeverage();
   const dailyFee = getSimDailyFee();
   const principal = buyPrice * shares;
-  ...
+
+  document.getElementById('simEtfRateHeader').textContent = `ETF 등락률(${leverage}배)(%)`;
+  document.getElementById('simPrincipalBox').value = `${principal.toLocaleString('ko-KR')} 원`;
+
   let prevClose = buyPrice;
   let etfPrice = buyPrice;
 
