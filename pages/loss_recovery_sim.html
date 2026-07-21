@@ -43,24 +43,27 @@
     <button class="reset-btn" onclick="resetSim()">초기화</button>
   </div>
 
-  <div class="table-scroll-container">
-    <div class="day-table-wrap">
-      <table class="day-table">
-        <thead>
-          <tr>
-            <th>일차</th>
-            <th>기초자산 증가(원)</th>
-            <th>기초자산 등락률(%)</th>
-            <th id="simEtfRateHeader">ETF 등락률(2배)(%)</th>
-            <th>ETF 주당 가격(원)</th>
-            <th>평가금액(원)</th>
-            <th>손익(원)</th>
-            <th>손익률(%)</th>
-            <th>삭제</th>
-          </tr>
-        </thead>
-        <tbody id="simTableBody"></tbody>
-      </table>
+  <div class="simulation-area">
+    <div id="simSummaryBox" class="summary-box-small"></div>
+    <div class="table-scroll-container">
+      <div class="day-table-wrap">
+        <table class="day-table">
+          <thead>
+            <tr>
+              <th>일차</th>
+              <th>기초자산 증가(원)</th>
+              <th>기초자산 등락률(%)</th>
+              <th id="simEtfRateHeader">ETF 등락률(2배)(%)</th>
+              <th>ETF 종가(원)</th>
+              <th>평가금액(원)</th>
+              <th>손익(원)</th>
+              <th>손익률(%)</th>
+              <th>삭제</th>
+            </tr>
+          </thead>
+          <tbody id="simTableBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -87,4 +90,3 @@
     <p class="report-empty">기본 설정과 일자별 시뮬레이션 데이터를 입력한 뒤 "리포트 생성" 버튼을 눌러주세요.</p>
   </div>
 </div>
-
