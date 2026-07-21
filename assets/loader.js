@@ -114,7 +114,8 @@ async function bootstrap(){
   footer.style.color = 'var(--subtext)';
   footer.style.marginTop = '20px';
   footer.style.padding = '10px';
-  footer.textContent = '© 2026 유승윤. All rights reserved. 본 페이지의 소스코드는 저작권법의 보호를 받으며, 무단 복제·배포·상업적 이용을 금합니다.';
+  footer.textContent = '© 2026 Seungyun Yu. All rights reserved.
+본 사이트의 자체 제작 콘텐츠·소스코드·디자인의 무단 복제, 재배포 및 상업적 이용을 금지합니다.';
   root.appendChild(footer);
 }
 
