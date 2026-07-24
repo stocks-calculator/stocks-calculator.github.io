@@ -1,19 +1,12 @@
 <!-- ETF 손실/복구 시뮬레이터 - loader.js 로 로드되는 tab-content -->
-<h1>레버리지 ETF 손실/복구 시뮬레이터</h1>
-<p class="subtitle">기초자산 하락 후 레버리지 ETF가 원금을 회복하는 데 필요한 상승률을 계산합니다.</p>
-
+<div class="container">
+  <h2>단기매매 시뮬레이터</h2>
+  <p class="subtitle">분할매수, 분할매도, 오버나잇 등 단기 트레이딩 전략을 시뮬레이션합니다.</p>
+  <p class="description">각 단계별로 '매수', '매도', '보유(오버나잇)' 액션을 선택하여 자유로운 매매 시나리오를 구성하고 그 결과를 확인해보세요.</p>
 <div class="card">
-  <h3>1. 기본 설정</h3>
+  <h3>1. 공통 설정</h3>
   <div class="grid2">
-    <div>
-      <label>매수 가격(원)</label>
-      <input type="text" id="simBuyPrice" inputmode="decimal" placeholder="예: 10,000" oninput="onSimNumInput(this); recalcSim()">
-    </div>
-    <div>
-      <label>매수 수량(주)</label>
-      <input type="text" id="simShares" inputmode="decimal" placeholder="예: 100" oninput="onSimNumInput(this); recalcSim()">
-    </div>
-    <div>
+    <div class="leverage-container">
       <label>레버리지</label>
       <div class="leverage-row">
         <select id="simLeverageSel" onchange="onLeverageSelChange()">
@@ -26,44 +19,48 @@
         </div>
       </div>
     </div>
-    <div>
+    <div class="fee-container">
       <label>연 운용수수료(%)</label>
-      <input type="text" id="simFeeRate" inputmode="decimal" placeholder="예: 0.7" oninput="onSimNumInput(this); recalcSim()">
+      <input type="text" id="simFeeRate" inputmode="decimal" placeholder="예: 0.95" oninput="onSimNumInput(this); recalcSim()">
     </div>
+  </div>
+  <div class="grid2" style="margin-top: 10px;">
     <div>
-      <label>매수 원금(원)</label>
-      <input type="text" id="simPrincipalBox" readonly>
+      <label>거래 수수료(%)</label>
+      <input type="text" id="simTradeFeeRate" inputmode="decimal" placeholder="매수/매도 시 (예: 0.015)" oninput="onSimNumInput(this); recalcSim()">
     </div>
   </div>
 </div>
 
 <div class="card">
   <div class="section-header">
-    <h3>2. 일자별 시뮬레이션</h3>
+    <h3>2. 거래 내역 시뮬레이션</h3>
     <button class="reset-btn" onclick="resetSim()">초기화</button>
   </div>
 
-  <div class="simulation-area">
-    <div id="simSummaryBox" class="summary-box-small"></div>
-    <div class="table-scroll-container">
-      <div class="day-table-wrap">
-        <table class="day-table">
-          <thead>
-            <tr>
-              <th>일차</th>
-              <th>기초자산 증가(원)</th>
-              <th>기초자산 등락률(%)</th>
-              <th id="simEtfRateHeader">ETF 등락률(2배)(%)</th>
-              <th>ETF 종가(원)</th>
-              <th>평가금액(원)</th>
-              <th>손익(원)</th>
-              <th>손익률(%)</th>
-              <th>삭제</th>
-            </tr>
-          </thead>
-          <tbody id="simTableBody"></tbody>
-        </table>
-      </div>
+  <div id="simSummaryBox" class="summary-box-large"></div>
+
+  <div class="table-scroll-container">
+    <div class="day-table-wrap">
+      <table class="day-table">
+        <thead>
+          <tr>
+            <th rowspan="2">단계</th>
+            <th rowspan="2">거래 유형</th>
+            <th colspan="2" class="trade-info-header">거래 정보</th>
+            <th colspan="3" class="hold-info-header">보유(오버나잇) 정보</th>
+            <th rowspan="2"></th>
+          </tr>
+          <tr>
+            <th class="trade-info-header">가격(원)</th>
+            <th class="trade-info-header">수량(주)</th>
+            <th class="hold-info-header">기초자산 등락률(%)</th>
+            <th class="hold-info-header">ETF 목표가(원)</th>
+            <th class="hold-info-header">ETF 현재가(원)</th>
+          </tr>
+        </thead>
+        <tbody id="simTableBody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -72,10 +69,11 @@
 </div>
 
 <div class="note">
-  ETF 등락률 = 기초자산 등락률 × 레버리지 배수 (일일 재조정 기준).<br>
-  <span class="formula">ETF 가격(t) = ETF 가격(t-1) × (1 + ETF등락률/100 - 일일수수료)</span><br>
-  ETF는 매일 리밸런싱하므로, 기초자산이 등락을 반복하면 레버리지 ETF는 원금 회복이 더 어려워지는 "감쇠 효과"가 발생합니다.<br>
-  표의 7개 값(기초자산 증가, 기초자산 등락률, ETF 등락률, ETF 주당 가격, 평가금액, 손익, 손익률) 중 어느 칸이든 값을 입력하면 나머지 값이 실시간으로 자동 계산됩니다.
+  <strong>💡 모든 거래는 위 표에서 시작합니다. 첫 거래로 '매수'를 선택하고 가격과 수량을 입력하여 시뮬레이션을 시작하세요.</strong><br>
+  <strong>거래 유형 설명:</strong><br>
+  - <strong>거래 수수료:</strong> '매수'와 '매도' 거래 시 총 거래금액에 대해 부과되어 '실현 손익'에 반영됩니다.<br>
+  - <strong>매수/매도:</strong> 특정 가격과 수량으로 거래를 실행합니다. 평균 단가와 보유 수량이 변경됩니다.<br>
+  - <strong>보유(오버나잇):</strong> 매매 없이 하루를 보유하고 넘어가는 경우를 시뮬레이션합니다. 오버나잇(갭) 및 장중 등락률을 입력하여 ETF의 다음 가격을 계산합니다. 변동성 끌림 효과가 반영됩니다.
 </div>
 
 <div class="card">
@@ -87,6 +85,7 @@
     </div>
   </div>
   <div id="simReportBox" class="report-box">
-    <p class="report-empty">기본 설정과 일자별 시뮬레이션 데이터를 입력한 뒤 "리포트 생성" 버튼을 눌러주세요.</p>
+    <p class="report-empty">거래 내역을 입력한 뒤 "리포트 생성" 버튼을 눌러주세요.</p>
   </div>
+</div>
 </div>

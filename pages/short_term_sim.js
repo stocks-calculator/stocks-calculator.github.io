@@ -1,5 +1,5 @@
 // ====================================================================
-// [레버리지 ETF 손실/복구 시뮬레이터 - 로직 파일]
+// [단기매매 시뮬레이터 - 로직 파일]
 // ====================================================================
 let simRows = [];
 
@@ -53,6 +53,12 @@ function getSimDailyFee(){
   return (annualFee / 100) / 365;
 }
 
+function getSimTradeFee(){
+  const el = document.getElementById('simTradeFeeRate');
+  const tradeFee = el ? parseNum(el.value) : 0;
+  return tradeFee / 100;
+}
+
 function onLeverageSelChange(){
   const sel = document.getElementById('simLeverageSel').value;
   document.getElementById('simCustomLeverageWrap').style.display = (sel === 'custom') ? 'block' : 'none';
@@ -60,8 +66,15 @@ function onLeverageSelChange(){
 }
 
 function addSimRow(){
-  simRows.push({ field: null, value: null });
-  renderSimTable();
+  simRows.push({
+    type: 'buy', // 'buy', 'sell', 'hold'
+    price: 0,
+    shares: 0,
+    overnightRate: 0,
+    underlyingRate: 0,
+    targetPrice: 0,
+  });
+  recalcSim(); // 행 추가 후 테이블을 다시 렌더링합니다.
 }
 
 function removeSimRow(idx){
@@ -70,154 +83,226 @@ function removeSimRow(idx){
   renderSimTable();
 }
 
+function onSimTypeChange(idx, el) {
+  simRows[idx].type = el.value;
+  // 타입 변경 시에는 전체 행의 구조가 바뀌므로, 전체를 다시 렌더링합니다.
+  recalcSim();
+}
+
 function resetSim(){
   simRows = [];
-  document.getElementById('simBuyPrice').value = '';
-  document.getElementById('simShares').value = '';
   document.getElementById('simLeverageSel').value = '2';
   document.getElementById('simLeverageCustom').value = '';
   document.getElementById('simCustomLeverageWrap').style.display = 'none';
   const feeEl = document.getElementById('simFeeRate');
   if (feeEl) feeEl.value = '';
+  const tradeFeeEl = document.getElementById('simTradeFeeRate');
+  if (tradeFeeEl) tradeFeeEl.value = '';
   addSimRow();
   addSimRow();
   addSimRow();
-  renderSimTable(); // Reset 시 Summary Box 등 UI를 즉시 갱신
+  addSimRow();
+  addSimRow();
+  addSimRow();
+  recalcSim();
 }
 
-// 사용자가 표의 7개 입력 필드 중 하나를 수정했을 때 호출됨
-function onSimFieldInput(idx, field, el){
-  onSimNumInput(el); // 실시간 쉼표 포맷팅 적용
-  simRows[idx] = { field: field, value: el.value }; // 포맷팅된 값을 임시 저장
-  updateOtherCells(idx, field); // 현재 칸을 제외한 나머지 칸들만 업데이트
-  simRows[idx] = { field: field, value: parseNum(el.value) }; // 계산을 위해 숫자 값으로 다시 저장
-}
+function onSimFieldChange(idx, field, el) {
+  onSimNumInput(el);
+  const parsedValue = parseNum(el.value);
+  const row = simRows[idx];
+  row[field] = parsedValue;
 
-function computeRowValues(field, value, prevClose, prevEtfPrice, leverage, dailyFee, shares, principal){
-  let underlyingRate, etfRate, etfPrice, delta;
-
-  if(field === 'delta'){
-    delta = value;
-    underlyingRate = prevClose ? (delta / prevClose) * 100 : 0;
-    etfRate = underlyingRate * leverage; // 수수료는 etfPrice 계산 시 차감
-    etfPrice = Math.trunc(prevEtfPrice * (1 + etfRate/100 - dailyFee));
-  } else if(field === 'underlyingRate'){
-    underlyingRate = value;
-    delta = prevClose * underlyingRate / 100;
-    etfRate = underlyingRate * leverage;
-    etfPrice = Math.trunc(prevEtfPrice * (1 + etfRate/100 - dailyFee));
-  } else if(field === 'etfRate'){
-    etfRate = value;
-    underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
-    delta = prevClose * underlyingRate / 100;
-    etfPrice = Math.trunc(prevEtfPrice * (1 + etfRate/100 - dailyFee));
-  } else if(field === 'etfPrice'){
-    etfPrice = Math.trunc(value);
-    etfRate = prevEtfPrice !== 0 ? ((etfPrice / prevEtfPrice) - 1 + dailyFee) * 100 : 0;
-    underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
-    delta = prevClose * underlyingRate / 100;
-  } else if(field === 'evalAmount'){
-    const evalAmount = value;
-    etfPrice = shares !== 0 ? Math.trunc(evalAmount / shares) : 0;
-    etfRate = prevEtfPrice !== 0 ? ((etfPrice / prevEtfPrice) - 1 + dailyFee) * 100 : 0;
-    underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
-    delta = prevClose * underlyingRate / 100;
-  } else if(field === 'pnl'){
-    const pnl = value;
-    const evalAmount = pnl + principal;
-    etfPrice = shares !== 0 ? Math.trunc(evalAmount / shares) : 0;
-    etfRate = prevEtfPrice !== 0 ? ((etfPrice / prevEtfPrice) - 1 + dailyFee) * 100 : 0;
-    underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
-    delta = prevClose * underlyingRate / 100;
-  } else if(field === 'pnlRate'){
-    const pnlRate = value;
-    const pnl = principal !== 0 ? (pnlRate / 100) * principal : 0;
-    const evalAmount = pnl + principal;
-    etfPrice = shares !== 0 ? Math.trunc(evalAmount / shares) : 0;
-    etfRate = prevEtfPrice !== 0 ? ((etfPrice / prevEtfPrice) - 1 + dailyFee) * 100 : 0;
-    underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
-    delta = prevClose * underlyingRate / 100;
-  } else {
-    delta = 0;
-    underlyingRate = 0;
-    etfRate = 0;
-    etfPrice = prevEtfPrice;
+  if (field === 'targetPrice' && parsedValue > 0) {
+    row.underlyingRate = 0; // 목표가 입력 시 등락률은 초기화 후 역산
+  } else if (field === 'underlyingRate') {
+    row.targetPrice = 0; // 등락률 직접 입력 시 목표가는 초기화
   }
+  // 입력 중에는 전체를 다시 그리지 않고, 다른 셀들만 업데이트하여 포커스 유실을 방지합니다.
+  updateOtherCells(idx, field);
+}
 
-  const closePrice = prevClose + delta;
-  const evalAmount = etfPrice * shares;
-  const pnl = evalAmount - principal;
-  const pnlRate = principal !== 0 ? (pnl / principal) * 100 : 0;
-
-  return { delta, underlyingRate, etfRate, etfPrice, closePrice, evalAmount, pnl, pnlRate };
+function onSimFieldBlur(idx, field, el) {
+    formatInputOnBlur(el, (field === 'underlyingRate' ? 2 : 0));
+    recalcSim(); // 입력이 끝나면 전체를 다시 계산하고 렌더링합니다.
 }
 
 function renderSimTable(){
   const tbody = document.getElementById('simTableBody');
   tbody.innerHTML = '';
 
-  const buyPrice = parseNum(document.getElementById('simBuyPrice').value);
-  const shares = parseNum(document.getElementById('simShares').value);
   const leverage = getSimLeverage();
   const dailyFee = getSimDailyFee();
-  const principal = buyPrice * shares;
+  const tradeFee = getSimTradeFee();
 
-  document.getElementById('simEtfRateHeader').textContent = `ETF 등락률(${leverage}배)(%)`;
-  document.getElementById('simPrincipalBox').value = principal > 0 ? `${principal.toLocaleString('ko-KR')} 원` : '';
-
-  // 매수 정보 요약 박스 업데이트
-  const summaryBox = document.getElementById('simSummaryBox');
-  const annualFee = parseNum(document.getElementById('simFeeRate').value);
-  summaryBox.innerHTML = `
-    <h4>매수 정보 요약</h4>
-    <table>
-      <tr><td>매수 가격</td><td>${buyPrice.toLocaleString('ko-KR')} 원</td></tr>
-      <tr><td>매수 수량</td><td>${shares.toLocaleString('ko-KR')} 주</td></tr>
-      <tr><td>매수 원금</td><td>${principal.toLocaleString('ko-KR')} 원</td></tr>
-      <tr><td>레버리지</td><td>${leverage} 배</td></tr>
-      <tr><td>연 운용수수료</td><td>${annualFee.toFixed(2)} %</td></tr>
-    </table>
-  `;
-
-  let prevClose = buyPrice;
-  let prevEtfPrice = buyPrice;
+  // 누적 계산을 위한 변수
+  let avgCost = 0, totalShares = 0, currentEtfPrice = 0, totalInvested = 0;
+  let realizedPnl = 0;
 
   simRows.forEach((row, idx) => {
-    let vals;
-    if(idx === 0){
-      // 0일차는 이제 별도 표로 표시되므로 건너뜀
-      return;
-    }
-    vals = computeRowValues(row.field, row.value, prevClose, prevEtfPrice, leverage, dailyFee, shares, principal);
-    prevClose = vals.closePrice;
-    prevEtfPrice = vals.etfPrice;
+    const step = idx + 1;
+    let nextEtfPrice = currentEtfPrice;
 
-    const rateCls = vals.underlyingRate >= 0 ? 'val-pos' : 'val-neg';
-    const etfCls = vals.etfRate >= 0 ? 'val-pos' : 'val-neg';
-    const pnlCls = vals.pnl >= 0 ? 'val-pos' : 'val-neg';
+    if (row.type === 'hold') {
+      if (row.targetPrice > 0 && currentEtfPrice > 0) {
+        const etfRate = (row.targetPrice / currentEtfPrice) - 1;
+        row.underlyingRate = leverage !== 0 ? (etfRate / leverage) * 100 : 0;
+        nextEtfPrice = row.targetPrice;
+      } else {
+        nextEtfPrice = Math.trunc(currentEtfPrice * (1 + (row.underlyingRate / 100 * leverage) - dailyFee));
+      }
+    } else if (row.type === 'buy') {
+      const buyShares = row.shares;
+      const buyPrice = row.price;
+      if (buyShares > 0 && buyPrice > 0) {
+        const newInvestment = buyPrice * buyShares;
+        totalInvested = (avgCost * totalShares) + newInvestment;
+        totalShares += buyShares;
+        realizedPnl -= newInvestment * tradeFee; // 매수 수수료를 실현 손익에서 차감
+        avgCost = totalShares > 0 ? totalInvested / totalShares : 0;
+      }
+      nextEtfPrice = buyPrice > 0 ? buyPrice : (currentEtfPrice || 0); // 매수 시 현재가는 매수가
+    } else if (row.type === 'sell') {
+      const sellShares = Math.min(row.shares, totalShares); // 보유 수량 초과 매도 방지
+      const sellPrice = row.price;
+      if (sellShares > 0 && sellPrice > 0) {
+        const pnlFromSale = (sellPrice - avgCost) * sellShares;
+        const feeFromSale = sellPrice * sellShares * tradeFee;
+        realizedPnl += pnlFromSale - feeFromSale; // 매도 손익에서 매도 수수료를 차감
+        totalInvested -= avgCost * sellShares;
+        totalShares -= sellShares;
+        if (totalShares <= 0) {
+          totalInvested = 0;
+          avgCost = 0;
+        }
+      }
+      nextEtfPrice = sellPrice > 0 ? sellPrice : (currentEtfPrice || 0); // 매도 시 현재가는 매도가
+    }
+
+    currentEtfPrice = nextEtfPrice;
 
     const tr = document.createElement('tr');
+    const isHold = row.type === 'hold';
+
+    const pricePlaceholder = (idx === 0 && row.type === 'buy') ? '첫 매수가격 입력' : (row.type === 'buy' ? '매수가' : '매도가');
+    const sharesPlaceholder = (idx === 0 && row.type === 'buy') ? '첫 매수수량 입력' : (row.type === 'buy' ? '매수수량' : '매도수량');
+
+    const tradeCells = `
+      <td><input type="text" class="dayReturnInput" placeholder="${pricePlaceholder}" data-field="price" value="${formatNumber(row.price, 0)}" oninput="onSimFieldChange(${idx}, 'price', this)" onblur="onSimFieldBlur(${idx}, 'price', this)"></td>
+      <td><input type="text" class="dayReturnInput" placeholder="${sharesPlaceholder}" data-field="shares" value="${formatNumber(row.shares, 0)}" oninput="onSimFieldChange(${idx}, 'shares', this)" onblur="onSimFieldBlur(${idx}, 'shares', this)"></td>
+    `;
+    const holdCells = `
+      <td><input type="text" class="dayReturnInput" placeholder="기초자산 등락률(%)" data-field="underlyingRate" value="${formatNumber(row.underlyingRate, 2)}" oninput="onSimFieldChange(${idx}, 'underlyingRate', this)" onblur="onSimFieldBlur(${idx}, 'underlyingRate', this)"></td>
+      <td><input type="text" class="dayReturnInput" placeholder="ETF 목표가" data-field="targetPrice" value="${formatNumber(row.targetPrice, 0)}" oninput="onSimFieldChange(${idx}, 'targetPrice', this)" onblur="onSimFieldBlur(${idx}, 'targetPrice', this)"></td>
+      <td class="etf-price-cell">${formatNumber(currentEtfPrice, 0)}</td>
+    `;
+
     tr.innerHTML = `
-      <td class="row-idx">${idx}</td>
-      <td><input type="text" class="dayReturnInput" data-field="delta" value="${formatNumber(row.field === 'delta' ? row.value : vals.delta, 0)}" oninput="onSimFieldInput(${idx}, 'delta', this)" onfocus="this.select()" onblur="formatInputOnBlur(this, 0)"></td>
-      <td class="${rateCls}"><input type="text" class="dayReturnInput" data-field="underlyingRate" value="${formatNumber(row.field === 'underlyingRate' ? row.value : vals.underlyingRate, 2)}" oninput="onSimFieldInput(${idx}, 'underlyingRate', this)" onfocus="this.select()" onblur="formatInputOnBlur(this, 2)"></td>
-      <td class="${etfCls}"><input type="text" class="dayReturnInput" data-field="etfRate" value="${formatNumber(row.field === 'etfRate' ? row.value : vals.etfRate, 2)}" oninput="onSimFieldInput(${idx}, 'etfRate', this)" onfocus="this.select()" onblur="formatInputOnBlur(this, 2)"></td>
-      <td><input type="text" class="dayReturnInput" data-field="etfPrice" value="${formatNumber(row.field === 'etfPrice' ? row.value : vals.etfPrice, 0)}" oninput="onSimFieldInput(${idx}, 'etfPrice', this)" onfocus="this.select()" onblur="formatInputOnBlur(this, 0)"></td>
-      <td><input type="text" class="dayReturnInput" data-field="evalAmount" value="${formatNumber(row.field === 'evalAmount' ? row.value : vals.evalAmount, 0)}" oninput="onSimFieldInput(${idx}, 'evalAmount', this)" onfocus="this.select()" onblur="formatInputOnBlur(this, 0)"></td>
-      <td class="${pnlCls}"><input type="text" class="dayReturnInput" data-field="pnl" value="${formatNumber(row.field === 'pnl' ? row.value : vals.pnl, 0)}" oninput="onSimFieldInput(${idx}, 'pnl', this)" onfocus="this.select()" onblur="formatInputOnBlur(this, 0)"></td>
-      <td class="${pnlCls}"><input type="text" class="dayReturnInput" data-field="pnlRate" value="${formatNumber(row.field === 'pnlRate' ? row.value : vals.pnlRate, 2)}" oninput="onSimFieldInput(${idx}, 'pnlRate', this)" onfocus="this.select()" onblur="formatInputOnBlur(this, 2)"></td>
+      <td class="row-idx">${step}</td>
+      <td>
+        <select onchange="onSimTypeChange(${idx}, this)">
+          <option value="buy" ${row.type === 'buy' ? 'selected' : ''}>매수</option>
+          <option value="sell" ${row.type === 'sell' ? 'selected' : ''}>매도</option>
+          <option value="hold" ${row.type === 'hold' ? 'selected' : ''}>보유(오버나잇)</option>
+        </select>
+      </td>
+      ${isHold ? `<td colspan="2" class="placeholder-cell"></td> ${holdCells}` : `${tradeCells} <td colspan="3" class="placeholder-cell"></td>`}
       <td><button class="del-btn" onclick="removeSimRow(${idx})">삭제</button></td>
     `;
     tbody.appendChild(tr);
   });
+
+  // 최종 상태 계산 및 요약 정보 업데이트
+  const evalAmount = currentEtfPrice * totalShares;
+  const unrealizedPnl = totalShares > 0 ? (currentEtfPrice - avgCost) * totalShares : 0;
+  const unrealizedPnlRate = (avgCost * totalShares) > 0 ? (unrealizedPnl / (avgCost * totalShares)) * 100 : 0;
+  const totalPnl = realizedPnl + unrealizedPnl;
+
+  const summaryBox = document.getElementById('simSummaryBox');
+  summaryBox.innerHTML = `
+    <table>
+      <tr>
+        <td>보유 수량</td><td class="summary-value">${formatNumber(totalShares, 0)} 주</td>
+        <td>평균 단가</td><td class="summary-value">${formatNumber(avgCost, 0)} 원</td>
+      </tr>
+      <tr>
+        <td>평가 금액</td><td class="summary-value">${formatNumber(evalAmount, 0)} 원</td>
+        <td>현재가</td><td class="summary-value">${formatNumber(currentEtfPrice, 0)} 원</td>
+      </tr>
+      <tr>
+        <td>미실현 손익</td>
+        <td class="summary-value ${unrealizedPnl >= 0 ? 'val-pos' : 'val-neg'}">
+          ${formatNumber(unrealizedPnl, 0)} 원 (${unrealizedPnlRate.toFixed(2)}%)
+        </td>
+        <td>실현 손익</td>
+        <td class="summary-value ${realizedPnl >= 0 ? 'val-pos' : 'val-neg'}">
+          ${formatNumber(realizedPnl, 0)} 원
+        </td>
+      </tr>
+       <tr>
+        <td>총 손익</td>
+        <td colspan="3" class="summary-value total-pnl ${totalPnl >= 0 ? 'val-pos' : 'val-neg'}">
+          ${formatNumber(totalPnl, 0)} 원
+        </td>
+      </tr>
+    </table>
+  `;
+}
+
+function updateOtherCells(changedRowIndex, changedField) {
+    // 이 함수는 입력 중 포커스를 잃지 않도록,
+    // 현재 수정 중인 칸을 제외한 나머지 모든 값들을 다시 계산하고 화면에 업데이트합니다.
+    const leverage = getSimLeverage();
+    const dailyFee = getSimDailyFee();
+    const tradeFee = getSimTradeFee();
+
+    let avgCost = 0, totalShares = 0, currentEtfPrice = 0, totalInvested = 0;
+    let realizedPnl = 0;
+
+    simRows.forEach((row, idx) => {
+        let nextEtfPrice = currentEtfPrice;
+
+        if (row.type === 'hold') {
+            if (idx === changedRowIndex && changedField === 'targetPrice' && row.targetPrice > 0 && currentEtfPrice > 0) {
+                const etfRate = (row.targetPrice / currentEtfPrice) - 1;
+                row.underlyingRate = leverage !== 0 ? (etfRate / leverage) * 100 : 0;
+                nextEtfPrice = row.targetPrice;
+            } else {
+                nextEtfPrice = Math.trunc(currentEtfPrice * (1 + (row.underlyingRate / 100 * leverage) - dailyFee));
+            }
+        } else if (row.type === 'buy') {
+            const buyShares = row.shares;
+            const buyPrice = row.price;
+            if (buyShares > 0 && buyPrice > 0) {
+                const newInvestment = buyPrice * buyShares;
+                totalInvested = (avgCost * totalShares) + newInvestment;
+                totalShares += buyShares;
+                realizedPnl -= newInvestment * tradeFee;
+                avgCost = totalShares > 0 ? totalInvested / totalShares : 0;
+            }
+            nextEtfPrice = buyPrice > 0 ? buyPrice : (currentEtfPrice || 0);
+        } else if (row.type === 'sell') {
+            // ... (sell logic is complex for real-time update, full recalc on blur is better)
+        }
+        currentEtfPrice = nextEtfPrice;
+
+        // Update UI for other cells if needed
+        const tr = document.getElementById('simTableBody').children[idx];
+        if (tr) {
+            if (row.type === 'hold') {
+                if (changedField !== 'underlyingRate') tr.querySelector('[data-field="underlyingRate"]').value = formatNumber(row.underlyingRate, 2);
+                tr.querySelector('.etf-price-cell').textContent = formatNumber(nextEtfPrice, 0);
+            }
+        }
+    });
 }
 
 function recalcSim(){
-  ['simBuyPrice', 'simShares', 'simLeverageCustom', 'simFeeRate'].forEach(id => {
+  ['simLeverageCustom', 'simFeeRate', 'simTradeFeeRate'].forEach(id => {
     const el = document.getElementById(id);
     if(el) onSimNumInput(el);
   });
-  renderSimTable();
+  renderSimTable(); // This will re-render everything based on current inputs
 }
 
 function formatNumber(num, fractionDigits) {
@@ -236,178 +321,216 @@ function formatInputOnBlur(el, fractionDigits) {
     el.value = formatNumber(value, fractionDigits);
 }
 
-function updateOtherCells(rowIndex, currentField) {
-    const buyPrice = parseNum(document.getElementById('simBuyPrice').value);
-    const shares = parseNum(document.getElementById('simShares').value);
-    const leverage = getSimLeverage();
-    const dailyFee = getSimDailyFee();
-    const principal = buyPrice * shares;
-
-    let prevClose = buyPrice;
-    let prevEtfPrice = buyPrice;
-
-    for (let i = 1; i < simRows.length; i++) {
-        const rowData = simRows[i];
-        const valueToUse = (i === rowIndex) ? parseNum(rowData.value) : rowData.value;
-        const fieldToUse = (i === rowIndex) ? currentField : rowData.field;
-
-        const vals = computeRowValues(fieldToUse, valueToUse, prevClose, prevEtfPrice, leverage, dailyFee, shares, principal);
-
-        if (i >= rowIndex) { // 현재 행 또는 그 이후의 행들만 값 업데이트
-            const rowEl = document.getElementById('simTableBody').children[i-1];
-            const inputs = rowEl.querySelectorAll('input.dayReturnInput');
-            inputs.forEach(input => {
-                const field = input.dataset.field;
-                if (field !== currentField || i !== rowIndex) { // 현재 수정중인 필드는 제외
-                    const fractionDigits = ['underlyingRate', 'etfRate', 'pnlRate'].includes(field) ? 2 : 0;
-                    input.value = formatNumber(vals[field], fractionDigits);
-                }
-            });
-        }
-        prevClose = vals.closePrice;
-        prevEtfPrice = vals.etfPrice;
-    }
-}
-
 function exportSimExcel(){
-  const shares = parseNum(document.getElementById('simShares').value);
-  const buyPrice = parseNum(document.getElementById('simBuyPrice').value);
-  const principal = buyPrice * shares;
-  const leverage = getSimLeverage();
-  const dailyFee = getSimDailyFee();
-  const annualFee = parseNum(document.getElementById('simFeeRate').value);
+  const { series, summary } = buildSimSeries();
+  if (series.length === 0) {
+    alert('저장할 데이터가 없습니다. 먼저 시뮬레이션을 실행해주세요.');
+    return;
+  }
 
-  const summaryData = [
-    ['매수 정보 요약'],
-    ['매수 가격', `${buyPrice.toLocaleString('ko-KR')} 원`],
-    ['매수 수량', `${shares.toLocaleString('ko-KR')} 주`],
-    ['매수 원금', `${principal.toLocaleString('ko-KR')} 원`],
-    ['레버리지', `${leverage} 배`],
-    ['연 운용수수료', `${annualFee.toFixed(2)} %`],
-    [] // 공백 행
+  // 1. 거래 내역 시트 데이터
+  const tradeLogHeader = ['단계', '거래유형', '거래가격', '거래수량', '기초자산등락률(%)', 'ETF 현재가', '보유수량', '평균단가', '평가금액', '실현손익(누적)', '미실현손익'];
+  const tradeLogRows = series.map(s => [
+    s.step,
+    s.type === 'buy' ? '매수' : s.type === 'sell' ? '매도' : '보유',
+    s.raw.price,
+    s.raw.shares,
+    s.raw.underlyingRate,
+    s.etfPrice,
+    s.totalShares,
+    s.avgCost,
+    s.evalAmount,
+    s.realizedPnl,
+    s.unrealizedPnl
+  ]);
+
+  // 2. 최종 요약 시트 데이터
+  const summaryHeader = ['항목', '값'];
+  const summaryRows = [
+    ['최초 투자 원금', summary.initialInvestment],
+    ['총 매수 금액 (최초 포함)', summary.totalBuyAmount],
+    ['총 매도 금액', summary.totalSellAmount],
+    [],
+    ['최종 보유 수량', summary.finalShares],
+    ['최종 평균 단가', summary.finalAvgCost],
+    ['최종 평가 금액', summary.finalEvalAmount],
+    [],
+    ['총 실현 손익', summary.realizedPnl],
+    ['최종 미실현 손익', summary.unrealizedPnl],
+    ['총 손익 (실현+미실현)', summary.totalPnl],
   ];
 
-  const tableHeader = ['일차', '기초자산 증가(원)', '기초자산 등락률(%)', `ETF 등락률(${leverage}배)(%)`, 'ETF 종가(원)', '평가금액(원)', '손익(원)', '손익률(%)'];
-  const tableRows = [tableHeader];
-
-  let prevClose = buyPrice;
-  let prevEtfPrice = buyPrice;
-  simRows.forEach((row, idx) => {
-    if(idx === 0) return; // 0일차(매수) 행은 건너뜀
-    const vals = computeRowValues(row.field, row.value, prevClose, prevEtfPrice, leverage, dailyFee, shares, principal);
-    prevClose = vals.closePrice;
-    prevEtfPrice = vals.etfPrice;
-
-    tableRows.push([idx, vals.delta.toFixed(0), vals.underlyingRate.toFixed(2), vals.etfRate.toFixed(2), vals.etfPrice.toFixed(0), vals.evalAmount.toFixed(0), vals.pnl.toFixed(0), vals.pnlRate.toFixed(2)]);
-  });
-
-  const finalSheetData = summaryData.concat(tableRows);
-
-  const ws = XLSX.utils.aoa_to_sheet(finalSheetData);
-
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'ETF시뮬레이션');
+  const wsLog = XLSX.utils.aoa_to_sheet([tradeLogHeader, ...tradeLogRows]);
+  const wsSummary = XLSX.utils.aoa_to_sheet([summaryHeader, ...summaryRows]);
+
+  wsLog['!cols'] = Array(tradeLogHeader.length).fill({ wch: 15 });
+  wsSummary['!cols'] = [{ wch: 25 }, { wch: 20 }];
+
+  XLSX.utils.book_append_sheet(wb, wsLog, '거래내역');
+  XLSX.utils.book_append_sheet(wb, wsSummary, '최종요약');
 
   const now = new Date();
   const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
-
-  XLSX.writeFile(wb, `레버리지손실복구시뮬레이션_${timestamp}.xlsx`);
+  XLSX.writeFile(wb, `단기매매_시뮬레이션_${timestamp}.xlsx`);
 }
 
 // ====================================================================
 // [3. 리포트 생성 기능]
 // ====================================================================
 function buildSimSeries(){
-  const buyPrice = parseNum(document.getElementById('simBuyPrice').value);
-  const shares = parseNum(document.getElementById('simShares').value);
   const leverage = getSimLeverage();
   const dailyFee = getSimDailyFee();
-  const principal = buyPrice * shares;
+  const tradeFee = getSimTradeFee();
 
-  let prevClose = buyPrice;
-  let prevEtfPrice = buyPrice;
+  let avgCost = 0, totalShares = 0, currentEtfPrice = 0;
+  let totalInvested = 0, totalBuyAmount = 0, totalSellAmount = 0, realizedPnl = 0;
+  let firstInvestment = 0;
+  let firstInvested = false;
+
   const series = [];
 
   simRows.forEach((row, idx) => {
-    let vals;
-    if(idx === 0){
-      vals = { delta: 0, underlyingRate: 0, etfRate: 0, etfPrice: buyPrice, closePrice: buyPrice, evalAmount: buyPrice*shares, pnl: 0, pnlRate: 0 };
-    } else {
-      vals = computeRowValues(row.field, row.value, prevClose, prevEtfPrice, leverage, dailyFee, shares, principal);
+    let nextEtfPrice = currentEtfPrice;
+
+    if (row.type === 'hold') {
+      const etfRate = row.underlyingRate / 100 * leverage;
+      nextEtfPrice = Math.trunc(currentEtfPrice * (1 + etfRate - dailyFee));
+    } else if (row.type === 'buy') {
+      const buyShares = row.shares;
+      const buyPrice = row.price;
+      if (buyShares > 0 && buyPrice > 0) {
+        const newInvestment = buyPrice * buyShares;
+        totalBuyAmount += newInvestment;
+        totalInvested = (avgCost * totalShares) + newInvestment;
+        realizedPnl -= newInvestment * tradeFee;
+        totalShares += buyShares;
+        avgCost = totalShares > 0 ? totalInvested / totalShares : 0;
+        if (!firstInvested) {
+          firstInvestment = newInvestment;
+          firstInvested = true;
+        }
+      }
+      nextEtfPrice = buyPrice > 0 ? buyPrice : currentEtfPrice;
+    } else if (row.type === 'sell') {
+      const sellShares = Math.min(row.shares, totalShares);
+      const sellPrice = row.price;
+      if (sellShares > 0 && sellPrice > 0) {
+        totalSellAmount += sellPrice * sellShares;
+        const feeFromSale = sellPrice * sellShares * tradeFee;
+        const pnlFromSale = (sellPrice - avgCost) * sellShares;
+        realizedPnl += pnlFromSale - feeFromSale;
+        totalInvested -= avgCost * sellShares;
+        totalShares -= sellShares;
+        if (totalShares <= 0) {
+          totalInvested = 0;
+          avgCost = 0;
+        }
+      }
+      nextEtfPrice = sellPrice > 0 ? sellPrice : currentEtfPrice;
     }
-    prevClose = vals.closePrice;
-    prevEtfPrice = vals.etfPrice;
-    series.push({ idx, ...vals });
+
+    currentEtfPrice = nextEtfPrice;
+    const evalAmount = currentEtfPrice * totalShares;
+    const unrealizedPnl = totalShares > 0 ? (currentEtfPrice - avgCost) * totalShares : 0;
+
+    series.push({
+      step: idx + 1,
+      type: row.type,
+      etfPrice: currentEtfPrice,
+      totalShares,
+      avgCost,
+      evalAmount,
+      realizedPnl,
+      unrealizedPnl,
+      raw: row
+    });
   });
 
-  return { series, buyPrice, shares, leverage, dailyFee, principal };
+  const last = series[series.length - 1] || {};
+  const summary = {
+    initialInvestment: firstInvestment,
+    totalBuyAmount,
+    totalSellAmount,
+    finalShares: last.totalShares || 0,
+    finalAvgCost: last.avgCost || 0,
+    finalEvalAmount: last.evalAmount || 0,
+    realizedPnl: last.realizedPnl || 0,
+    unrealizedPnl: last.unrealizedPnl || 0,
+    totalPnl: (last.realizedPnl || 0) + (last.unrealizedPnl || 0),
+  };
+
+  return { series, summary };
 }
 
 function generateSimReport(){
-  const { series, buyPrice, shares, leverage, dailyFee, principal } = buildSimSeries();
+  const { series, summary } = buildSimSeries();
   const reportBox = document.getElementById('simReportBox');
   if(!reportBox) return;
 
-  if(series.length < 2 || principal === 0){
-    reportBox.innerHTML = '<p class="report-empty">리포트를 생성하려면 먼저 기본 설정(매수 가격, 매수 수량)과 일자별 시뮬레이션 데이터를 입력해주세요.</p>';
+  if(series.length === 0 || summary.totalBuyAmount === 0){
+    reportBox.innerHTML = '<p class="report-empty">리포트를 생성하려면 먼저 기본 설정과 거래 내역을 입력해주세요.</p>';
     return;
   }
 
-  const last = series[series.length - 1];
-
-  const underlyingCumRate = buyPrice !== 0 ? ((last.closePrice - buyPrice) / buyPrice) * 100 : 0;
-  const etfCumRate = buyPrice !== 0 ? ((last.etfPrice - buyPrice) / buyPrice) * 100 : 0;
-  const decayGap = (underlyingCumRate * leverage) - etfCumRate;
-
-  let underlyingPeak = buyPrice, underlyingMDD = 0, underlyingMddDay = 0;
-  let etfPeak = buyPrice, etfMDD = 0;
-  let mddDay = 0;
+  // MDD 계산
+  let peakEval = 0;
+  let mdd = 0;
+  let mddStep = 0;
   series.forEach(s => {
-    if(s.closePrice > underlyingPeak) underlyingPeak = s.closePrice;
-    const uDD = underlyingPeak !== 0 ? ((s.closePrice - underlyingPeak) / underlyingPeak) * 100 : 0;
-    if(uDD < underlyingMDD) {
-      underlyingMDD = uDD;
-      underlyingMddDay = s.idx;
+    if (s.evalAmount > peakEval) peakEval = s.evalAmount;
+    // 전량 매도하여 평가금액이 0인 경우는 MDD 계산에서 제외
+    if (s.evalAmount === 0) return;
+    const drawdown = peakEval > 0 ? ((s.evalAmount - peakEval) / peakEval) * 100 : 0;
+    if (drawdown < mdd) {
+      mdd = drawdown;
+      mddStep = s.step;
     }
-
-    if(s.etfPrice > etfPeak) etfPeak = s.etfPrice;
-    const eDD = etfPeak !== 0 ? ((s.etfPrice - etfPeak) / etfPeak) * 100 : 0;
-    if(eDD < etfMDD){ etfMDD = eDD; mddDay = s.idx; }
   });
 
-  const requiredReboundRate = last.etfPrice !== 0 ? ((buyPrice / last.etfPrice) - 1) * 100 : 0;
-  const requiredUnderlyingRebound = leverage !== 0 ? requiredReboundRate / leverage : 0;
+  // 승률, 손익비 계산
+  const sellTrades = series.filter(s => s.type === 'sell' && s.raw.shares > 0);
+  let winningTrades = 0, losingTrades = 0, totalProfit = 0, totalLoss = 0;
 
-  const finalPnl = last.pnl;
-  const finalPnlRate = last.pnlRate;
-  const isProfit = finalPnl >= 0;
+  series.forEach((s, i) => {
+    if (s.type === 'sell' && s.raw.shares > 0) {
+      const prevAvgCost = i > 0 ? series[i-1].avgCost : 0;
+      const pnl = s.raw.price - prevAvgCost;
+      if (pnl > 0) {
+        winningTrades++;
+        totalProfit += pnl * s.raw.shares;
+      } else {
+        losingTrades++;
+        totalLoss += pnl * s.raw.shares;
+      }
+    }
+  });
 
-  const annualFeeImpact = dailyFee * series.length * 100;
+  const totalTrades = winningTrades + losingTrades;
+  const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
+  const avgProfit = winningTrades > 0 ? totalProfit / winningTrades : 0;
+  const avgLoss = losingTrades > 0 ? totalLoss / losingTrades : 0;
+  const profitLossRatio = Math.abs(avgLoss) > 0 ? avgProfit / Math.abs(avgLoss) : 0;
 
-  let riskLevel = '낮음';
-  if(Math.abs(etfMDD) >= 30) riskLevel = '매우 높음';
-  else if(Math.abs(etfMDD) >= 15) riskLevel = '높음';
-  else if(Math.abs(etfMDD) >= 5) riskLevel = '보통';
+  const isProfit = summary.totalPnl >= 0;
 
   const html = `
     <div class="report-summary">
-      <h4>시뮬레이션 리포트 (${series.length - 1}일차 기준)</h4>
+      <h4>매매 성과 리포트 (${series.length} 단계 기준)</h4>
       <table class="report-table">
-        <tr><td>현재 손익</td><td class="${isProfit ? 'val-pos':'val-neg'}">${finalPnl.toLocaleString('ko-KR', {maximumFractionDigits:0})} 원 (${finalPnlRate.toFixed(2)}%)</td></tr>
-        <tr><td>기초자산 누적 등락률</td><td class="${underlyingCumRate>=0?'val-pos':'val-neg'}">${underlyingCumRate.toFixed(2)}%</td></tr>
-        <tr><td>ETF(${leverage}배) 누적 등락률</td><td class="${etfCumRate>=0?'val-pos':'val-neg'}">${etfCumRate.toFixed(2)}%</td></tr>
-        <tr><td>레버리지 감쇠 효과(경로 의존성 손실)</td><td class="val-neg">-${Math.abs(decayGap).toFixed(2)}%p</td></tr>
-        <tr><td>ETF 최대낙폭(MDD)</td><td class="val-neg">${etfMDD.toFixed(2)}% (at ${mddDay}일차)</td></tr>
-        <tr><td>기초자산 최대낙폭(MDD)</td><td class="val-neg">${underlyingMDD.toFixed(2)}% (at ${underlyingMddDay}일차)</td></tr>
-        <tr><td>원금 회복에 필요한 ETF 상승률</td><td>${requiredReboundRate > 0 ? requiredReboundRate.toFixed(2) + '%' : '이미 회복(또는 초과 수익)'}</td></tr>
-        <tr><td>원금 회복에 필요한 기초자산 상승률</td><td>${requiredUnderlyingRebound > 0 ? requiredUnderlyingRebound.toFixed(2) + '%' : '-'}</td></tr>
-        <tr><td>수수료로 인한 대략적 손실 영향</td><td class="val-neg">-${annualFeeImpact.toFixed(2)}%</td></tr>
-        <tr><td>리스크 수준(MDD 기준)</td><td>${riskLevel}</td></tr>
+        <tr><td>총 손익 (실현+미실현)</td><td class="${isProfit ? 'val-pos':'val-neg'}">${formatNumber(summary.totalPnl, 0)} 원</td></tr>
+        <tr><td>실현 손익</td><td class="${summary.realizedPnl >= 0 ? 'val-pos':'val-neg'}">${formatNumber(summary.realizedPnl, 0)} 원</td></tr>
+        <tr><td>최대 낙폭 (MDD)</td><td class="val-neg">${mdd.toFixed(2)}% (at ${mddStep}단계)</td></tr>
+        <tr><td>총 거래 횟수 (매도 기준)</td><td>${totalTrades} 회</td></tr>
+        <tr><td>승률</td><td>${winRate.toFixed(1)}% (${winningTrades}승 ${losingTrades}패)</td></tr>
+        <tr><td>손익비 (Profit/Loss Ratio)</td><td>${profitLossRatio.toFixed(2)}</td></tr>
+        <tr><td>평균 익절 금액</td><td class="val-pos">${formatNumber(avgProfit, 0)} 원</td></tr>
+        <tr><td>평균 손절 금액</td><td class="val-neg">${formatNumber(avgLoss, 0)} 원</td></tr>
       </table>
       <div class="report-narrative">
-        <p>${series.length - 1}일 동안 기초자산은 ${underlyingCumRate.toFixed(2)}% ${underlyingCumRate>=0?'상승':'하락'}했으나, ${leverage}배 레버리지 ETF는 ${etfCumRate.toFixed(2)}% ${etfCumRate>=0?'상승':'하락'}했습니다. 이론적으로는 기초자산 등락률의 ${leverage}배(${(underlyingCumRate*leverage).toFixed(2)}%)가 되어야 하지만, 일일 재조정에 따른 경로 의존성(변동성 감쇠) 효과로 약 ${Math.abs(decayGap).toFixed(2)}%p의 차이가 발생했습니다.</p>
-        <p>현재 평가 결과는 ${isProfit ? '이익' : '손실'} 상태이며, 손익률은 ${finalPnlRate.toFixed(2)}%입니다. ${requiredReboundRate > 0 ? `원금을 회복하려면 ETF가 추가로 ${requiredReboundRate.toFixed(2)}% 상승해야 하며, 이는 기초자산 기준으로 약 ${requiredUnderlyingRebound.toFixed(2)}% 상승에 해당합니다.` : '현재 이미 매수 원금 이상을 회복한 상태입니다.'}</p>
-        <p>시뮬레이션 기간 중 ETF는 ${mddDay}일차에 최대 ${Math.abs(etfMDD).toFixed(2)}%까지 낙폭을 기록했으며, 이는 기초자산 최대낙폭 ${Math.abs(underlyingMDD).toFixed(2)}%보다 ${Math.abs(etfMDD) > Math.abs(underlyingMDD) ? '더 큰' : '유사하거나 작은'} 수준입니다. 레버리지 ETF는 변동성이 큰 구간에서는 상승과 하락을 반복할수록 원금 회복이 더 어려워지는 구조적 특성이 있으므로, 장기 보유 시 이 감쇠 효과를 반드시 고려해야 합니다.</p>
+        <p>총 ${series.length}단계의 시뮬레이션 결과, <strong>총 ${formatNumber(summary.totalPnl, 0)}원</strong>의 ${isProfit ? '이익' : '손실'}을 기록했습니다. 이 중 확정된 실현 손익은 ${formatNumber(summary.realizedPnl, 0)}원입니다.</p>
+        <p>총 ${totalTrades}번의 매도 거래 중 ${winningTrades}번 이익을 보아 <strong>승률은 ${winRate.toFixed(1)}%</strong>입니다. 평균 익절 금액은 ${formatNumber(avgProfit,0)}원, 평균 손절 금액은 ${formatNumber(avgLoss,0)}원으로 <strong>손익비는 ${profitLossRatio.toFixed(2)}</strong>를 기록했습니다. ${profitLossRatio > 1 ? '손절보다 익절 금액이 커서 안정적인 전략입니다.' : '익절보다 손절 금액이 커서 손실 관리에 유의해야 하는 전략입니다.'}</p>
+        <p>전략의 안정성을 나타내는 <strong>최대 낙폭(MDD)은 -${Math.abs(mdd).toFixed(2)}%</strong>로, 투자 기간 중 자산 가치가 고점 대비 최대 이만큼 하락한 시점이 있었습니다. MDD가 낮을수록 안정적인 전략으로 평가할 수 있습니다.</p>
       </div>
     </div>
   `;
@@ -435,4 +558,5 @@ function downloadSimReport(){
   URL.revokeObjectURL(url);
 }
 
+// 페이지가 처음 로드될 때 시뮬레이터를 초기화합니다.
 resetSim();
