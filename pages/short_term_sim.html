@@ -1,97 +1,84 @@
-<!-- ETF 단기 가격경로 시뮬레이터 - loader.js에서 tab-content로 로드 -->
-<h1>ETF 단기 시뮬레이터</h1>
-<p class="subtitle">매수 후 일자별 등락률/가격 경로에 따른 ETF 평가금액과 손익을 시뮬레이션합니다.</p>
-
+<!-- ETF 손실/복구 시뮬레이터 - loader.js 로 로드되는 tab-content -->
+<h1>단기매매 시뮬레이터</h1>
+<p class="subtitle">매수/매도/보유 등 거래 내역을 입력하여 복잡한 투자 전략의 손익을 시뮬레이션합니다.</p>
 <div class="card">
   <h3>1. 기본 설정</h3>
   <div class="grid2">
-    <div>
-      <label>매수 가격</label>
-      <input type="text" id="shortBuyPrice" inputmode="decimal" placeholder="예: 10,000"
-        oninput="shortTermSim.recalc()">
-    </div>
-    <div>
-      <label>매수 수량</label>
-      <input type="text" id="shortShares" inputmode="decimal" placeholder="예: 100"
-        oninput="shortTermSim.recalc()">
-    </div>
     <div>
       <label>레버리지</label>
       <div class="leverage-row">
         <select id="shortLeverageSel" onchange="shortTermSim.onLeverageSelChange()">
           <option value="2" selected>2배</option>
           <option value="3">3배</option>
-          <option value="custom">커스텀</option>
+          <option value="custom">직접입력</option>
         </select>
         <div id="shortCustomLeverageWrap" style="display:none">
-          <input type="text" id="shortLeverageCustom" placeholder="배수 입력"
-            oninput="shortTermSim.recalc()">
+          <input type="text" id="shortLeverageCustom" placeholder="배수 입력" oninput="shortTermSim.recalc()">
         </div>
       </div>
     </div>
     <div>
       <label>연 운용수수료(%)</label>
-      <input type="text" id="shortFeeRate" inputmode="decimal" placeholder="예: 0.7"
-        oninput="shortTermSim.recalc()">
+      <input type="text" id="shortFeeRate" inputmode="decimal" placeholder="예: 0.7" oninput="shortTermSim.recalc()">
     </div>
+  </div>
+  <div class="grid2" style="margin-top: 10px;">
     <div>
-      <label>매수 원금</label>
-      <input type="text" id="shortPrincipalBox" readonly>
+      <label>거래 수수료(%)</label>
+      <input type="text" id="shortTradeFeeRate" inputmode="decimal" placeholder="매수/매도 시 (예: 0.015)" oninput="shortTermSim.recalc()">
     </div>
   </div>
 </div>
 
 <div class="card">
   <div class="section-header">
-    <h3>2. 일자별 시뮬레이션</h3>
+    <h3>2. 거래 내역 시뮬레이션</h3>
     <button class="reset-btn" onclick="shortTermSim.reset()">초기화</button>
   </div>
 
   <div class="simulation-area">
-    <div id="shortSummaryBox" class="summary-box-small"></div>
-
+    <div id="shortSummaryBox" class="summary-box-large"></div>
     <div class="table-scroll-container">
       <div class="day-table-wrap">
         <table class="day-table">
           <thead>
             <tr>
-              <th>일차</th>
-              <th>변동가</th>
+              <th>단계</th>
+              <th>거래 유형</th>
+              <th>가격(원)</th>
+              <th>수량(주)</th>
               <th>기초자산 등락률(%)</th>
-              <th id="shortEtfRateHeader">ETF 등락률(2배)(%)</th>
-              <th>ETF 가격</th>
-              <th>평가금액</th>
-              <th>손익</th>
-              <th>손익률(%)</th>
-              <th></th>
+              <th>ETF 목표가(원)</th>
+              <th>ETF 현재가(원)</th>
+              <th>삭제</th>
             </tr>
           </thead>
           <tbody id="shortTableBody"></tbody>
         </table>
       </div>
     </div>
-
-    <button class="add-btn" onclick="shortTermSim.addRow()">행 추가</button>
-    <button class="excel-btn" onclick="shortTermSim.exportExcel()">엑셀로 내보내기</button>
   </div>
 
-  <div class="note">
-    ETF 가격은 일일 재조정 방식으로 계산됩니다.<br>
-    <span class="formula">ETF(t) = ETF(t-1) × (1 + 기초자산등락률 × 레버리지 / 100 - 일일수수료)</span><br>
-    기초자산 등락률, ETF 등락률, ETF 가격, 평가금액, 손익, 손익률 중 하나를 입력하면 나머지 값들이 자동으로 역산됩니다.
-    7개 입력 필드 중 어느 것을 입력해도 동일한 시뮬레이션 결과를 얻을 수 있습니다.
-  </div>
+  <button class="add-btn" onclick="shortTermSim.addRow()">행 추가</button>
+  <button class="excel-btn" onclick="shortTermSim.exportExcel()">엑셀 저장</button>
+</div>
+
+<div class="note">
+  <strong>거래 유형 설명:</strong><br>
+  - <strong>매수/매도:</strong> 특정 가격과 수량으로 거래를 실행합니다. 평균 단가와 보유 수량이 변경됩니다.<br>
+  - <strong>보유(오버나잇):</strong> 매매 없이 하루를 보유하고 넘어가는 경우를 시뮬레이션합니다. '기초자산 등락률' 또는 'ETF 목표가'를 입력하여 다음 날의 ETF 가격을 계산합니다. 이 과정에서 변동성 끌림(Decay) 효과가 반영됩니다.<br>
+  - <strong>거래 수수료:</strong> '매수' 시에는 평균 단가에 반영되며, '매도' 시에는 실현 손익에서 차감됩니다.
 </div>
 
 <div class="card">
   <div class="section-header">
-    <h3>3. 결과 리포트</h3>
+    <h3>3. 시뮬레이션 리포트</h3>
     <div class="section-header-actions">
       <button class="add-btn" onclick="shortTermSim.generateReport()">리포트 생성</button>
       <button class="excel-btn" onclick="shortTermSim.downloadReport()">리포트 다운로드</button>
     </div>
   </div>
   <div id="shortReportBox" class="report-box">
-    <p class="report-empty">리포트를 생성하려면 먼저 기본 설정(매수 가격, 매수 수량)과 일자별 시뮬레이션 데이터를 입력해주세요.</p>
+    <p class="report-empty">기본 설정과 일자별 시뮬레이션 데이터를 입력한 뒤 "리포트 생성" 버튼을 눌러주세요.</p>
   </div>
 </div>
