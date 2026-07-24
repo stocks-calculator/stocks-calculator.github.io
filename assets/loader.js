@@ -6,8 +6,8 @@ const TABS = [
   { id: 'calculator', name: '레버리지 계산기', html: './assets/calculator.html', js: './assets/calculator.js', enabled: true },
   { id: 'loss_recovery_sim', name: '장기투자 시뮬레이터', html: './pages/loss_recovery_sim.html', js: './pages/loss_recovery_sim.js', enabled: true },
   { id: 'short_term_sim', name: '단기매매 시뮬레이터', html: './pages/short_term_sim.html', js: './pages/short_term_sim.js', enabled: true },
-  { id: 'disclaimer', name: '이용약관/면책조항', html: './pages/disclaimer.html', js: './pages/disclaimer.js', enabled: true },
-  { id: 'privacy', name: '개인정보처리방침', html: './pages/privacy.html', js: './pages/privacy.js', enabled: true }
+  { id: 'disclaimer', name: '이용약관/면책조항', html: './pages/disclaimer.html', js: './pages/disclaimer.js', enabled: false },
+  { id: 'privacy', name: '개인정보처리방침', html: './pages/privacy.html', js: './pages/privacy.js', enabled: false }
 ];
 
 function loadScriptOnce(src){
@@ -55,8 +55,8 @@ function buildTabBar(container){
 const loadedTabs = new Set();
 
 async function activateTab(tabId){
-  const tab = TABS.find(t => t.id === tabId && t.enabled);
-  if(!tab) return;
+  const tabInfo = TABS.find(t => t.id === tabId);
+  if(!tabInfo) return;
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tabId === tabId);
   });
@@ -76,8 +76,8 @@ async function activateTab(tabId){
   }
 
   if(!loadedTabs.has(tabId)){
-    pane.innerHTML = await fetchText(tab.html);
-    await loadScriptOnce(tab.js);
+    pane.innerHTML = await fetchText(tabInfo.html);
+    await loadScriptOnce(tabInfo.js);
     loadedTabs.add(tabId);
   }
 
@@ -108,6 +108,28 @@ async function bootstrap(){
   if(firstEnabled) await activateTab(firstEnabled.id);
 
   await injectAdsense();
+
+  const policyLinks = document.createElement('div');
+  policyLinks.style.textAlign = 'center';
+  policyLinks.style.fontSize = '11px';
+  policyLinks.style.color = 'var(--subtext)';
+  policyLinks.style.marginTop = '20px';
+  policyLinks.style.padding = '0 10px';
+
+  const disclaimerLink = document.createElement('a');
+  disclaimerLink.href = './pages/disclaimer.html';
+  disclaimerLink.target = '_blank';
+  disclaimerLink.textContent = '이용약관/면책조항';
+
+  const privacyLink = document.createElement('a');
+  privacyLink.href = './pages/privacy.html';
+  privacyLink.target = '_blank';
+  privacyLink.textContent = '개인정보처리방침';
+
+  policyLinks.appendChild(disclaimerLink);
+  policyLinks.append(' | ');
+  policyLinks.appendChild(privacyLink);
+  root.appendChild(policyLinks);
 
   const footer = document.createElement('div');
   footer.style.textAlign = 'center';
