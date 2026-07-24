@@ -4,8 +4,8 @@
 
 const TABS = [
   { id: 'calculator', name: '레버리지 계산기', html: './assets/calculator.html', js: './assets/calculator.js', enabled: true },
-  { id: 'loss_recovery_sim', name: '장기투자 시뮬레이터', html: './pages/loss_recovery_sim.html', js: './pages/loss_recovery_sim.js', enabled: true },
-  { id: 'short_term_sim', name: '단기매매 시뮬레이터', html: './pages/short_term_sim.html', js: './pages/short_term_sim.js', enabled: true },
+  { id: 'loss_recovery_sim', name: '장기투자 시뮬레이터', html: './pages/short_term_sim.html', js: './pages/short_term_sim.js', enabled: true },
+  { id: 'short_term_sim', name: '단기매매 시뮬레이터', html: './pages/loss_recovery_sim.html', js: './pages/loss_recovery_sim.js', enabled: true },
   { id: 'disclaimer', name: '이용약관/면책조항', html: './pages/disclaimer.html', js: './pages/disclaimer.js', enabled: false },
   { id: 'privacy', name: '개인정보처리방침', html: './pages/privacy.html', js: './pages/privacy.js', enabled: false }
 ];
@@ -61,6 +61,10 @@ async function activateTab(tabId){
     b.classList.toggle('active', b.dataset.tabId === tabId);
   });
 
+  // 1. History API를 사용하여 URL을 변경하고, 페이지 제목을 동적으로 업데이트합니다.
+  document.title = `${tabInfo.name} | 레버리지 손익 시뮬레이션 계산기`;
+  history.pushState({tabId: tabId}, tabInfo.name, `#${tabId}`);
+
   const contentEl = document.getElementById('tab-content');
 
   TABS.filter(t => t.enabled).forEach(t => {
@@ -79,10 +83,26 @@ async function activateTab(tabId){
     pane.innerHTML = await fetchText(tabInfo.html);
     await loadScriptOnce(tabInfo.js);
     loadedTabs.add(tabId);
+
+    // 탭 로드 후 초기화 함수 호출
+    if (tabId === 'loss_recovery_sim' && window.shortTermSim) {
+      window.shortTermSim.init();
+    }
+    if (tabId === 'short_term_sim' && window.lossRecoverySim) {
+      window.lossRecoverySim.init();
+    }
+
   }
 
   pane.style.display = 'block';
 }
+
+// 2. 브라우저의 뒤로가기/앞으로가기 버튼에 대응하기 위한 이벤트 리스너를 추가합니다.
+window.addEventListener('popstate', (event) => {
+  if (event.state && event.state.tabId) {
+    activateTab(event.state.tabId);
+  }
+});
 
 async function injectAdsense(){
   try {
@@ -95,7 +115,7 @@ async function injectAdsense(){
 
 async function bootstrap(){
   await loadCSS('./assets/styles.css');
-  await loadScriptOnce('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js');
+  await loadScriptOnce('./common_utils.js'); // 공통 유틸리티 스크립트 우선 로드
 
   const root = document.getElementById('app-root');
   buildTabBar(root);
@@ -104,9 +124,13 @@ async function bootstrap(){
   contentEl.id = 'tab-content';
   root.appendChild(contentEl);
 
-  const firstEnabled = TABS.find(t => t.enabled);
-  if(firstEnabled) await activateTab(firstEnabled.id);
+  // 3. 페이지 첫 로드 시 URL의 해시값을 확인하여 해당 탭을 활성화합니다.
+  const initialTabId = window.location.hash.substring(1);
+  const tabToLoad = TABS.find(t => t.id === initialTabId && t.enabled) || TABS.find(t => t.enabled);
 
+  if(tabToLoad) await activateTab(tabToLoad.id);
+
+  await loadScriptOnce('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js');
   await injectAdsense();
 
   const policyLinks = document.createElement('div');

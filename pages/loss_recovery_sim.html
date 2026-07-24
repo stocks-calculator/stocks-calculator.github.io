@@ -1,38 +1,31 @@
 <!-- ETF 손실/복구 시뮬레이터 - loader.js 로 로드되는 tab-content -->
 <h1>레버리지 ETF 손실/복구 시뮬레이터</h1>
-<p class="subtitle">기초자산 하락 후 레버리지 ETF가 원금을 회복하는 데 필요한 상승률을 계산합니다.</p>
-
+<p class="subtitle">기초자산의 일별 수익률을 입력하여 레버리지 ETF의 손실 및 복구 과정을 시뮬레이션합니다.</p>
 <div class="card">
   <h3>1. 기본 설정</h3>
   <div class="grid2">
     <div>
-      <label>매수 가격(원)</label>
-      <input type="text" id="simBuyPrice" inputmode="decimal" placeholder="예: 10,000" oninput="onSimNumInput(this); recalcSim()">
-    </div>
-    <div>
-      <label>매수 수량(주)</label>
-      <input type="text" id="simShares" inputmode="decimal" placeholder="예: 100" oninput="onSimNumInput(this); recalcSim()">
-    </div>
-    <div>
       <label>레버리지</label>
       <div class="leverage-row">
-        <select id="simLeverageSel" onchange="onLeverageSelChange()">
+        <select id="lossLeverageSel" onchange="lossRecoverySim.onLeverageSelChange()">
           <option value="2" selected>2배</option>
           <option value="3">3배</option>
           <option value="custom">직접입력</option>
         </select>
-        <div id="simCustomLeverageWrap" style="display:none">
-          <input type="text" id="simLeverageCustom" placeholder="배수 입력" oninput="onSimNumInput(this); recalcSim()">
+        <div id="lossCustomLeverageWrap" style="display:none">
+          <input type="text" id="lossLeverageCustom" placeholder="배수 입력" oninput="lossRecoverySim.recalc()">
         </div>
       </div>
     </div>
     <div>
       <label>연 운용수수료(%)</label>
-      <input type="text" id="simFeeRate" inputmode="decimal" placeholder="예: 0.7" oninput="onSimNumInput(this); recalcSim()">
+      <input type="text" id="lossFeeRate" inputmode="decimal" placeholder="예: 0.7" oninput="lossRecoverySim.recalc()">
     </div>
+  </div>
+  <div class="grid2" style="margin-top: 10px;">
     <div>
-      <label>매수 원금(원)</label>
-      <input type="text" id="simPrincipalBox" readonly>
+      <label>거래 수수료(%)</label>
+      <input type="text" id="lossTradeFeeRate" inputmode="decimal" placeholder="매수/매도 시 (예: 0.015)" oninput="lossRecoverySim.recalc()">
     </div>
   </div>
 </div>
@@ -40,11 +33,11 @@
 <div class="card">
   <div class="section-header">
     <h3>2. 일자별 시뮬레이션</h3>
-    <button class="reset-btn" onclick="resetSim()">초기화</button>
+    <button class="reset-btn" onclick="lossRecoverySim.reset()">초기화</button>
   </div>
 
   <div class="simulation-area">
-    <div id="simSummaryBox" class="summary-box-small"></div>
+    <div id="lossSummaryBox" class="summary-box-large"></div>
     <div class="table-scroll-container">
       <div class="day-table-wrap">
         <table class="day-table">
@@ -53,7 +46,7 @@
               <th>일차</th>
               <th>기초자산 증가(원)</th>
               <th>기초자산 등락률(%)</th>
-              <th id="simEtfRateHeader">ETF 등락률(2배)(%)</th>
+              <th>ETF 등락률(2배)(%)</th>
               <th>ETF 종가(원)</th>
               <th>평가금액(원)</th>
               <th>손익(원)</th>
@@ -61,14 +54,14 @@
               <th>삭제</th>
             </tr>
           </thead>
-          <tbody id="simTableBody"></tbody>
+          <tbody id="lossTableBody"></tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <button class="add-btn" onclick="addSimRow()">행 추가</button>
-  <button class="excel-btn" onclick="exportSimExcel()">엑셀 저장</button>
+  <button class="add-btn" onclick="lossRecoverySim.addRow()">행 추가</button>
+  <button class="excel-btn" onclick="lossRecoverySim.exportExcel()">엑셀 저장</button>
 </div>
 
 <div class="note">
@@ -82,11 +75,11 @@
   <div class="section-header">
     <h3>3. 시뮬레이션 리포트</h3>
     <div class="section-header-actions">
-      <button class="add-btn" onclick="generateSimReport()">리포트 생성</button>
-      <button class="excel-btn" onclick="downloadSimReport()">리포트 다운로드</button>
+      <button class="add-btn" onclick="lossRecoverySim.generateReport()">리포트 생성</button>
+      <button class="excel-btn" onclick="lossRecoverySim.downloadReport()">리포트 다운로드</button>
     </div>
   </div>
-  <div id="simReportBox" class="report-box">
+  <div id="lossReportBox" class="report-box">
     <p class="report-empty">기본 설정과 일자별 시뮬레이션 데이터를 입력한 뒤 "리포트 생성" 버튼을 눌러주세요.</p>
   </div>
 </div>
