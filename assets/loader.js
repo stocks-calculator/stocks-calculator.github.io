@@ -5,7 +5,7 @@
 const TABS = [
   { id: 'calculator', name: '레버리지 계산기', html: './assets/calculator.html', js: './assets/calculator.js', enabled: true },
   { id: 'loss_recovery_sim', name: '장기투자 시뮬레이터', html: './pages/loss_recovery_sim.html', js: './pages/loss_recovery_sim.js', enabled: true },
-  { id: 'loss_recovery_sim', name: '단기매매 시뮬레이터', html: './pages/short_term_sim.html', js: './pages/short_term_sim.js', enabled: true },
+  { id: 'short_term_sim', name: '단기매매 시뮬레이터', html: './pages/short_term_sim.html', js: './pages/short_term_sim.js', enabled: true },
   { id: 'disclaimer', name: '이용약관/면책조항', html: './pages/disclaimer.html', js: './pages/disclaimer.js', enabled: true },
   { id: 'privacy', name: '개인정보처리방침', html: './pages/privacy.html', js: './pages/privacy.js', enabled: true }
 ];
