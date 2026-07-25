@@ -48,8 +48,12 @@
               <th>가격(원)</th>
               <th>수량(주)</th>
               <th>기초자산 등락률(%)</th>
-              <th>ETF 목표가(원)</th>
-              <th>ETF 현재가(원)</th>
+              <th>레버리지 목표가(원)</th>
+              <th>레버리지 최종가(원)</th>
+              <th>보유 수량</th>
+              <th>평균 단가</th>
+              <th>실현 손익(단계별)</th>
+              <th>평가 금액</th>
               <th>삭제</th>
             </tr>
           </thead>
@@ -63,11 +67,19 @@
   <button class="excel-btn" onclick="shortTermSim.exportExcel()">엑셀 저장</button>
 </div>
 
+<div class="ad-slot">
+  광고공간
+</div>
+
 <div class="note">
   <strong>거래 유형 설명:</strong><br>
-  - <strong>매수/매도:</strong> 특정 가격과 수량으로 거래를 실행합니다. 평균 단가와 보유 수량이 변경됩니다.<br>
-  - <strong>보유(오버나잇):</strong> 매매 없이 하루를 보유하고 넘어가는 경우를 시뮬레이션합니다. '기초자산 등락률' 또는 'ETF 목표가'를 입력하여 다음 날의 ETF 가격을 계산합니다. 이 과정에서 변동성 끌림(Decay) 효과가 반영됩니다.<br>
-  - <strong>거래 수수료:</strong> '매수' 시에는 평균 단가에 반영되며, '매도' 시에는 실현 손익에서 차감됩니다.
+  - <strong>매수/매도:</strong> '가격'과 '수량'을 입력하여 거래를 실행합니다. '기초자산 등락률'과 '레버리지 목표가'는 무시됩니다.<br>
+  - <strong>보유(오버나잇):</strong> '기초자산 등락률' 또는 '레버리지 목표가'를 입력하여 하루 보유를 시뮬레이션합니다. '가격'과 '수량'은 무시되며, '레버리지 목표가' 입력 시 우선 적용됩니다.<br>
+  <br>
+  <strong>주요 계산식:</strong><br>
+  - <strong>보유 시 가격:</strong> <span class="formula">다음날 가격 = 전날 가격 × (1 + 기초등락률 × 레버리지 - 일일수수료)</span><br>
+  - <strong>매도 시 손익:</strong> <span class="formula">실현손익 = (매도가 - 평균단가) × 수량 - 매도수수료</span><br>
+  - <strong>매수 시 평균단가:</strong> <span class="formula">평균단가 = (총 매수비용) / (총 보유수량)</span>
 </div>
 
 <div class="card">

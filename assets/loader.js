@@ -104,21 +104,18 @@ window.addEventListener('popstate', (event) => {
   }
 });
 
-async function injectAdsense(){
-  try {
-    const adHtml = await fetchText('./assets/adsense.html');
-    const wrap = document.createElement('div');
-    wrap.innerHTML = adHtml;
-    document.getElementById('app-root').appendChild(wrap);
-  } catch(e) {}
-}
-
 async function bootstrap(){
   await loadCSS('./assets/styles.css');
   await loadScriptOnce('./common_utils.js'); // 공통 유틸리티 스크립트 우선 로드
 
   const root = document.getElementById('app-root');
   buildTabBar(root);
+
+  // 상단 공통 광고 슬롯 추가
+  const topAdSlot = document.createElement('div');
+  topAdSlot.className = 'ad-slot top-ad';
+  topAdSlot.textContent = '광고공간';
+  root.appendChild(topAdSlot);
 
   const contentEl = document.createElement('div');
   contentEl.id = 'tab-content';
@@ -131,7 +128,12 @@ async function bootstrap(){
   if(tabToLoad) await activateTab(tabToLoad.id);
 
   await loadScriptOnce('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js');
-  await injectAdsense();
+
+  // 하단 공통 광고 슬롯 추가
+  const bottomAdSlot = document.createElement('div');
+  bottomAdSlot.className = 'ad-slot';
+  bottomAdSlot.textContent = '광고공간';
+  root.appendChild(bottomAdSlot);
 
   const policyLinks = document.createElement('div');
   policyLinks.style.textAlign = 'center';

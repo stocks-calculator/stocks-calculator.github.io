@@ -143,11 +143,6 @@
     updateOtherCells(idx, field);
   }
 
-  function onSimFieldBlur(idx, field, el) {
-    formatInputOnBlur(el, (field === 'underlyingRate' ? 2 : 0));
-    recalcSim();
-  }
-
   function onSimTypeChange(idx, el) {
     simRows[idx].type = el.value;
     recalcSim();
@@ -156,27 +151,27 @@
   // hold 행 계산을 화면/시리즈에서 공통으로 사용하기 위한 함수.
   // targetPrice가 입력되어 있으면 이를 우선하고, 없으면 underlyingRate로 계산합니다.
   // 반환값의 etfPrice는 반올림하지 않은 실수입니다 (표시 시에만 반올림).
-  function calculateHoldStep({ currentEtfPrice, targetPrice, underlyingRate, leverage, dailyFee }) {
-    if (targetPrice > 0 && currentEtfPrice > 0) {
-      const etfRate = (targetPrice / currentEtfPrice) - 1;
-      const impliedUnderlyingRate = leverage !== 0 ? (etfRate / leverage) * 100 : 0;
+  function calculateHoldStep({ currentLeveragePrice, targetPrice, underlyingRate, leverage, dailyFee }) {
+    if (targetPrice > 0 && currentLeveragePrice > 0) {
+      const leverageRate = (targetPrice / currentLeveragePrice) - 1;
+      const impliedUnderlyingRate = leverage !== 0 ? (leverageRate / leverage) * 100 : 0;
       return {
-        etfPrice: targetPrice,
+        leveragePrice: targetPrice,
         underlyingRate: impliedUnderlyingRate,
       };
     }
 
-    const etfRate = (underlyingRate / 100 * leverage);
-    const nextPrice = currentEtfPrice * (1 + etfRate - dailyFee);
+    const leverageRate = (underlyingRate / 100 * leverage);
+    const nextPrice = currentLeveragePrice * (1 + leverageRate - dailyFee);
     return {
-      etfPrice: nextPrice,
+      leveragePrice: nextPrice,
       underlyingRate,
     };
   }
 
   // 매수 1행의 손익/원가 계산을 화면/시리즈에서 공통으로 사용.
   // 매수 수수료를 원가(총투입금, 평균단가)에 포함시킵니다.
-  function applyBuyStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentEtfPrice }) {
+  function applyBuyStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentLeveragePrice }) {
     const buyShares = row.shares;
     const buyPrice = row.price;
     let realizedPnlDelta = 0;
@@ -194,23 +189,24 @@
       nextAvgCost = nextTotalShares > 0 ? nextTotalInvested / nextTotalShares : 0;
     }
 
-    const nextEtfPrice = buyPrice > 0 ? buyPrice : (currentEtfPrice || 0);
+    const nextLeveragePrice = buyPrice > 0 ? buyPrice : (currentLeveragePrice || 0);
 
     return {
       avgCost: nextAvgCost,
       totalShares: nextTotalShares,
       totalInvested: nextTotalInvested,
       realizedPnlDelta,
-      etfPrice: nextEtfPrice,
+      leveragePrice: nextLeveragePrice,
       grossBuyAmount: (buyShares > 0 && buyPrice > 0) ? buyPrice * buyShares : 0,
     };
   }
 
   // 매도 1행의 손익 계산을 화면/시리즈에서 공통으로 사용.
-  function applySellStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentEtfPrice }) {
+  function applySellStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentLeveragePrice }) {
     const sellShares = Math.min(row.shares, totalShares);
     const sellPrice = row.price;
     let realizedPnlDelta = 0;
+    let sellFee = 0;
     let nextAvgCost = avgCost;
     let nextTotalShares = totalShares;
     let nextTotalInvested = totalInvested;
@@ -218,7 +214,8 @@
     if (sellShares > 0 && sellPrice > 0) {
       const pnlFromSale = (sellPrice - avgCost) * sellShares;
       const feeFromSale = sellPrice * sellShares * tradeFee;
-      realizedPnlDelta = pnlFromSale - feeFromSale;
+      realizedPnlDelta = pnlFromSale - feeFromSale; // 실현손익은 수수료 차감 후
+      sellFee = feeFromSale;
 
       nextTotalInvested = totalInvested - (avgCost * sellShares);
       nextTotalShares = totalShares - sellShares;
@@ -229,9 +226,16 @@
       }
     }
 
-    const nextEtfPrice = sellPrice > 0 ? sellPrice : (currentEtfPrice || 0);
+    const nextLeveragePrice = sellPrice > 0 ? sellPrice : (currentLeveragePrice || 0);
 
-    return { avgCost: nextAvgCost, totalShares: nextTotalShares, totalInvested: nextTotalInvested, realizedPnlDelta, etfPrice: nextEtfPrice };
+    return {
+      avgCost: nextAvgCost,
+      totalShares: nextTotalShares,
+      totalInvested: nextTotalInvested,
+      realizedPnlDelta,
+      leveragePrice: nextLeveragePrice,
+      sellFee,
+    };
   }
 
   function renderSimTable() {
@@ -242,59 +246,72 @@
     const dailyFee = getSimDailyFee();
     const tradeFee = getSimTradeFee();
 
-    let avgCost = 0, totalShares = 0, currentEtfPrice = 0, totalInvested = 0;
+    let avgCost = 0, totalShares = 0, currentLeveragePrice = 0, totalInvested = 0;
     let realizedPnl = 0;
 
     simRows.forEach((row, idx) => {
       const step = idx + 1;
-      let nextEtfPrice = currentEtfPrice;
+      let nextLeveragePrice = currentLeveragePrice;
+      let stepRealizedPnl = 0;
 
       if (row.type === 'hold') {
         const result = calculateHoldStep({
-          currentEtfPrice, targetPrice: row.targetPrice,
+          currentLeveragePrice, targetPrice: row.targetPrice,
           underlyingRate: row.underlyingRate, leverage, dailyFee,
         });
         row.underlyingRate = result.underlyingRate;
-        nextEtfPrice = result.etfPrice;
+        nextLeveragePrice = result.leveragePrice;
       } else if (row.type === 'buy') {
-        const result = applyBuyStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentEtfPrice });
+        const result = applyBuyStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentLeveragePrice });
         avgCost = result.avgCost;
         totalShares = result.totalShares;
         totalInvested = result.totalInvested;
-        realizedPnl += result.realizedPnlDelta;
-        nextEtfPrice = result.etfPrice;
+        stepRealizedPnl = result.realizedPnlDelta;
+        realizedPnl += stepRealizedPnl;
+        nextLeveragePrice = result.leveragePrice;
       } else if (row.type === 'sell') {
-        const result = applySellStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentEtfPrice });
+        const result = applySellStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentLeveragePrice });
         avgCost = result.avgCost;
         totalShares = result.totalShares;
         totalInvested = result.totalInvested;
-        realizedPnl += result.realizedPnlDelta;
-        nextEtfPrice = result.etfPrice;
+        stepRealizedPnl = result.realizedPnlDelta;
+        realizedPnl += stepRealizedPnl;
+        nextLeveragePrice = result.leveragePrice;
       }
 
-      currentEtfPrice = nextEtfPrice;
+      currentLeveragePrice = nextLeveragePrice;
+      const evalAmount = currentLeveragePrice * totalShares;
+      const pnlCls = stepRealizedPnl >= 0 ? 'val-pos' : 'val-neg';
+
 
       const tr = document.createElement('tr');
       const isHold = row.type === 'hold';
-      const displayEtfPrice = Math.trunc(currentEtfPrice);
+      const displayLeveragePrice = Math.trunc(currentLeveragePrice);
 
       const tradeCells = `
         <td><input type="text" class="dayReturnInput" data-field="price" value="${formatNumber(row.price, 0)}"
-          oninput="shortTermSim.onFieldChange(${idx}, 'price', this)"
-          onblur="shortTermSim.onFieldBlur(${idx}, 'price', this)"></td>
+          oninput="shortTermSim.onFieldChange(${idx}, 'price', this)" onfocus="this.select()"
+          onblur="shortTermSim.onFieldBlur(${idx}, 'price', this)" onkeydown="if(event.key==='Enter') this.blur()"></td>
         <td><input type="text" class="dayReturnInput" data-field="shares" value="${formatNumber(row.shares, 0)}"
-          oninput="shortTermSim.onFieldChange(${idx}, 'shares', this)"
-          onblur="shortTermSim.onFieldBlur(${idx}, 'shares', this)"></td>
+          oninput="shortTermSim.onFieldChange(${idx}, 'shares', this)" onfocus="this.select()"
+          onblur="shortTermSim.onFieldBlur(${idx}, 'shares', this)" onkeydown="if(event.key==='Enter') this.blur()"></td>
       `;
 
       const holdCells = `
         <td><input type="text" class="dayReturnInput" data-field="underlyingRate" value="${formatNumber(row.underlyingRate, 2)}"
-          oninput="shortTermSim.onFieldChange(${idx}, 'underlyingRate', this)"
-          onblur="shortTermSim.onFieldBlur(${idx}, 'underlyingRate', this)"></td>
+          oninput="shortTermSim.onFieldChange(${idx}, 'underlyingRate', this)" onfocus="this.select()"
+          onblur="shortTermSim.onFieldBlur(${idx}, 'underlyingRate', this)" onkeydown="if(event.key==='Enter') this.blur()"></td>
         <td><input type="text" class="dayReturnInput" data-field="targetPrice" value="${formatNumber(row.targetPrice, 0)}"
-          oninput="shortTermSim.onFieldChange(${idx}, 'targetPrice', this)"
-          onblur="shortTermSim.onFieldBlur(${idx}, 'targetPrice', this)"></td>
-        <td class="etf-price-cell">${formatNumber(displayEtfPrice, 0)}</td>
+          oninput="shortTermSim.onFieldChange(${idx}, 'targetPrice', this)" onfocus="this.select()"
+          onblur="shortTermSim.onFieldBlur(${idx}, 'targetPrice', this)" onkeydown="if(event.key==='Enter') this.blur()"></td>
+        <td class="leverage-price-cell">${formatNumber(displayLeveragePrice, 0)}</td>
+      `;
+
+      const resultCells = `
+        <td>${formatNumber(totalShares, 0)}</td>
+        <td>${formatNumber(avgCost, 0)}</td>
+        <td class="${pnlCls}">${stepRealizedPnl !== 0 ? formatNumber(stepRealizedPnl, 0) : '-'}</td>
+        <td>${formatNumber(evalAmount, 0)}</td>
       `;
 
       tr.innerHTML = `
@@ -303,29 +320,34 @@
           <select onchange="shortTermSim.onTypeChange(${idx}, this)">
             <option value="buy" ${row.type === 'buy' ? 'selected' : ''}>매수</option>
             <option value="sell" ${row.type === 'sell' ? 'selected' : ''}>매도</option>
-            <option value="hold" ${row.type === 'hold' ? 'selected' : ''}>보유</option>
+            <option value="hold" ${row.type === 'hold' ? 'selected' : ''}>보유(오버나잇)</option>
           </select>
         </td>
         ${isHold ? `<td colspan="2" class="placeholder-cell">-</td>${holdCells}` : `${tradeCells}<td colspan="3" class="placeholder-cell">-</td>`}
+        ${resultCells}
         <td><button class="del-btn" onclick="shortTermSim.removeRow(${idx})">삭제</button></td>
       `;
       tbody.appendChild(tr);
     });
 
-    const evalAmount = currentEtfPrice * totalShares;
-    const unrealizedPnl = totalShares > 0 ? (currentEtfPrice - avgCost) * totalShares : 0;
+    const evalAmount = currentLeveragePrice * totalShares;
+    const unrealizedPnl = totalShares > 0 ? (currentLeveragePrice - avgCost) * totalShares : 0;
     const unrealizedPnlRate = (avgCost * totalShares) > 0 ? (unrealizedPnl / (avgCost * totalShares)) * 100 : 0;
     const totalPnl = realizedPnl + unrealizedPnl;
 
     const summaryBox = document.getElementById(ID.summaryBox);
     summaryBox.innerHTML = `
       <table>
+        <tr><td>레버리지</td><td class="summary-value">${leverage} 배</td>
+            <td>연 운용수수료</td><td class="summary-value">${formatNumber(parseNum(document.getElementById(ID.feeRate).value), 2)} %</td></tr>
+        <tr><td>거래 수수료</td><td class="summary-value">${formatNumber(tradeFee * 100, 4)} %</td>
+            <td>현재가</td><td class="summary-value">${formatNumber(Math.trunc(currentLeveragePrice), 0)} 원</td></tr>
+        <tr><td colspan="4"><hr style="border-color: var(--border); margin: 4px 0; border-style: dashed;"></td></tr>
         <tr><td>보유 수량</td><td class="summary-value">${formatNumber(totalShares, 0)} 주</td>
             <td>평균 단가</td><td class="summary-value">${formatNumber(avgCost, 0)} 원</td></tr>
         <tr><td>평가 금액</td><td class="summary-value">${formatNumber(evalAmount, 0)} 원</td>
-            <td>현재가</td><td class="summary-value">${formatNumber(Math.trunc(currentEtfPrice), 0)} 원</td></tr>
-        <tr><td>미실현 손익</td><td class="summary-value ${unrealizedPnl >= 0 ? 'val-pos' : 'val-neg'}">${formatNumber(unrealizedPnl, 0)} 원 (${unrealizedPnlRate.toFixed(2)}%)</td>
             <td>실현 손익</td><td class="summary-value ${realizedPnl >= 0 ? 'val-pos' : 'val-neg'}">${formatNumber(realizedPnl, 0)} 원</td></tr>
+        <tr><td>미실현 손익</td><td colspan="3" class="summary-value ${unrealizedPnl >= 0 ? 'val-pos' : 'val-neg'}">${formatNumber(unrealizedPnl, 0)} 원 (${unrealizedPnlRate.toFixed(2)}%)</td></tr>
         <tr><td>총 손익</td><td colspan="3" class="summary-value total-pnl ${totalPnl >= 0 ? 'val-pos' : 'val-neg'}">${formatNumber(totalPnl, 0)} 원</td></tr>
       </table>
     `;
@@ -338,24 +360,29 @@
 
     const row = simRows[rowIndex];
     if (row.type === 'hold') {
-      let currentEtfPrice = 0;
-      // This logic to get currentEtfPrice is simplified and might not be fully accurate without a full recalc,
+      let currentLeveragePrice = 0;
+      // This logic to get currentLeveragePrice is simplified and might not be fully accurate without a full recalc,
       // but it's for preview purposes. A full recalc happens on blur.
       if (rowIndex > 0) {
         const prevRowEl = document.getElementById(ID.tableBody).children[rowIndex - 1];
-        const priceCell = prevRowEl.querySelector('.etf-price-cell');
-        if (priceCell) currentEtfPrice = parseNum(priceCell.textContent);
+        const priceCell = prevRowEl.querySelector('.leverage-price-cell');
+        if (priceCell) currentLeveragePrice = parseNum(priceCell.textContent);
       }
 
-      const result = calculateHoldStep({ currentEtfPrice, targetPrice: row.targetPrice, underlyingRate: row.underlyingRate, leverage: getSimLeverage(), dailyFee: getSimDailyFee() });
+      const result = calculateHoldStep({ currentLeveragePrice, targetPrice: row.targetPrice, underlyingRate: row.underlyingRate, leverage: getSimLeverage(), dailyFee: getSimDailyFee() });
 
       if (currentField !== 'underlyingRate') {
         const rateInput = tr.querySelector('[data-field="underlyingRate"]');
         if (rateInput) rateInput.value = formatNumber(result.underlyingRate, 2);
       }
-      const priceCell = tr.querySelector('.etf-price-cell');
-      if (priceCell) priceCell.textContent = formatNumber(Math.trunc(result.etfPrice), 0);
+      const priceCell = tr.querySelector('.leverage-price-cell');
+      if (priceCell) priceCell.textContent = formatNumber(Math.trunc(result.leveragePrice), 0);
     }
+  }
+
+  function onSimFieldBlur(idx, field, el) {
+    formatInputOnBlur(el, (field === 'underlyingRate' ? 2 : 0));
+    recalcSim();
   }
 
   function recalcSim() {
@@ -371,63 +398,82 @@
     const dailyFee = getSimDailyFee();
     const tradeFee = getSimTradeFee();
 
-    let avgCost = 0, totalShares = 0, currentEtfPrice = 0;
-    let totalInvested = 0, totalBuyAmount = 0, totalSellAmount = 0, realizedPnl = 0;
-    let firstInvestment = 0;
-    let firstInvested = false;
+    let avgCost = 0, totalShares = 0, currentLeveragePrice = 0;
+    let totalInvested = 0, realizedPnl = 0;
 
+    // 리포트용 상세 데이터
+    let totalBuyAmount = 0, totalSellAmount = 0;
+    let totalTradeFee = 0, totalMgmtFee = 0;
+    let buyCount = 0, sellCount = 0, winCount = 0, lossCount = 0;
+    let totalProfit = 0, totalLoss = 0;
+    let maxWin = 0, maxLoss = 0;
+    let maxInvested = 0;
     const series = [];
 
     simRows.forEach((row, idx) => {
-      let nextEtfPrice = currentEtfPrice;
+      let nextLeveragePrice = currentLeveragePrice;
+      let stepRealizedPnl = 0;
 
       if (row.type === 'hold') {
         const result = calculateHoldStep({
-          currentEtfPrice, targetPrice: row.targetPrice,
+          currentLeveragePrice, targetPrice: row.targetPrice,
           underlyingRate: row.underlyingRate, leverage, dailyFee,
         });
-        nextEtfPrice = result.etfPrice;
+        nextLeveragePrice = result.leveragePrice;
       } else if (row.type === 'buy') {
-        const result = applyBuyStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentEtfPrice });
+        const result = applyBuyStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentLeveragePrice });
         if (result.grossBuyAmount > 0) {
           totalBuyAmount += result.grossBuyAmount;
-          if (!firstInvested) {
-            firstInvestment = result.grossBuyAmount;
-            firstInvested = true;
-          }
+          const buyFee = result.grossBuyAmount * tradeFee;
+          totalTradeFee += buyFee;
+          buyCount++;
         }
         avgCost = result.avgCost;
         totalShares = result.totalShares;
         totalInvested = result.totalInvested;
-        realizedPnl += result.realizedPnlDelta;
-        nextEtfPrice = result.etfPrice;
+        stepRealizedPnl = result.realizedPnlDelta;
+        realizedPnl += stepRealizedPnl;
+        nextLeveragePrice = result.leveragePrice;
+        if (totalInvested > maxInvested) maxInvested = totalInvested;
       } else if (row.type === 'sell') {
-        const result = applySellStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentEtfPrice });
-        totalSellAmount += result.grossSellAmount;
+        const result = applySellStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentLeveragePrice });
+        const sellAmount = row.price * Math.min(row.shares, totalShares);
+        if (sellAmount > 0) {
+          totalSellAmount += sellAmount;
+          totalTradeFee += result.sellFee;
+          sellCount++;
+          if (result.realizedPnlDelta > 0) { winCount++; totalProfit += result.realizedPnlDelta; if (result.realizedPnlDelta > maxWin) maxWin = result.realizedPnlDelta; }
+          else { lossCount++; totalLoss += result.realizedPnlDelta; if (result.realizedPnlDelta < maxLoss) maxLoss = result.realizedPnlDelta; }
+        }
+
         avgCost = result.avgCost;
         totalShares = result.totalShares;
         totalInvested = result.totalInvested;
-        realizedPnl += result.realizedPnlDelta;
-        nextEtfPrice = result.etfPrice;
+        stepRealizedPnl = result.realizedPnlDelta;
+        realizedPnl += stepRealizedPnl;
+        nextLeveragePrice = result.leveragePrice;
       }
 
-      currentEtfPrice = nextEtfPrice;
+      currentLeveragePrice = nextLeveragePrice;
 
-      const evalAmount = currentEtfPrice * totalShares;
-      const unrealizedPnl = totalShares > 0 ? (currentEtfPrice - avgCost) * totalShares : 0;
+      const evalAmount = currentLeveragePrice * totalShares;
+      const unrealizedPnl = totalShares > 0 ? (currentLeveragePrice - avgCost) * totalShares : 0;
 
       series.push({
         step: idx + 1,
         type: row.type,
-        etfPrice: currentEtfPrice,
-        totalShares, avgCost, evalAmount, realizedPnl, unrealizedPnl,
+        leveragePrice: currentLeveragePrice,
+        totalShares, avgCost, evalAmount, realizedPnl, unrealizedPnl, stepRealizedPnl,
         raw: row,
       });
     });
 
+  // 총 운용수수료는 모든 거래가 끝난 후, 각 단계의 보유일수(hold)와 평가금액을 기반으로 일괄 계산
+  totalMgmtFee = series.reduce((acc, s) => acc + (s.type === 'hold' ? (s.evalAmount / (1 + (s.raw.underlyingRate/100 * leverage))) * dailyFee : 0), 0);
+
     const last = series[series.length - 1] || {};
     const summary = {
-      initialInvestment: firstInvestment,
+      // 기본 요약
       totalBuyAmount,
       totalSellAmount,
       finalShares: last.totalShares || 0,
@@ -436,6 +482,16 @@
       realizedPnl: last.realizedPnl || 0,
       unrealizedPnl: last.unrealizedPnl || 0,
       totalPnl: (last.realizedPnl || 0) + (last.unrealizedPnl || 0),
+      // 리포트용 상세
+      maxInvested,
+      totalTradeFee,
+      totalMgmtFee,
+      buyCount, sellCount,
+      winCount, lossCount,
+      totalProfit, totalLoss,
+      maxWin, maxLoss,
+      winRate: (winCount + lossCount) > 0 ? (winCount / (winCount + lossCount)) * 100 : 0,
+      plRatio: totalLoss !== 0 ? Math.abs(totalProfit / totalLoss) : 0,
     };
 
     return { series, summary };
@@ -448,37 +504,56 @@
       return;
     }
 
-    const tradeLogHeader = ['단계', '유형', '가격', '수량', '등락률(%)', 'ETF가격', '보유수량', '평균단가', '평가금액', '실현손익', '미실현손익'];
+    const tradeLogHeader = ['단계', '유형', '가격', '수량', '등락률(%)', '레버리지가격', '보유수량', '평균단가', '평가금액', '실현손익(단계별)', '누적 실현손익', '미실현손익'];
     const tradeLogRows = series.map((s) => [
       s.step,
       s.type === 'buy' ? '매수' : (s.type === 'sell' ? '매도' : '보유'),
       s.raw.price, s.raw.shares, s.raw.underlyingRate,
-      Math.trunc(s.etfPrice), s.totalShares, Math.trunc(s.avgCost),
-      Math.trunc(s.evalAmount), Math.trunc(s.realizedPnl), Math.trunc(s.unrealizedPnl),
+      Math.trunc(s.leveragePrice), s.totalShares, Math.trunc(s.avgCost),
+      Math.trunc(s.evalAmount),
+      Math.trunc(s.stepRealizedPnl), // 단계별 실현손익
+      Math.trunc(s.realizedPnl), // 누적 실현손익
+      Math.trunc(s.unrealizedPnl),
     ]);
 
     const summaryHeader = ['항목', '값'];
     const summaryRows = [
-      ['최초 투입금', summary.initialInvestment],
+      // 설정 정보
+      ['레버리지', `${getSimLeverage()} 배`],
+      ['연 운용수수료(%)', parseNum(document.getElementById(ID.feeRate).value).toFixed(2)],
+      ['거래 수수료(%)', (getSimTradeFee() * 100).toFixed(4)],
+      [], // 구분선
+      // 자산 정보
+      ['현재가', Math.trunc(series.length > 0 ? series[series.length - 1].leveragePrice : 0)],
+      ['보유 수량', summary.finalShares],
+      ['평균 단가', Math.trunc(summary.finalAvgCost)],
+      ['평가 금액', Math.trunc(summary.finalEvalAmount)],
+      [], // 구분선
+      // 손익 정보
+      ['실현 손익', Math.trunc(summary.realizedPnl)],
+      ['미실현 손익', Math.trunc(summary.unrealizedPnl)],
+      ['총 손익', Math.trunc(summary.totalPnl)],
+      [], // 구분선
+      // 거래/비용 요약
       ['총 매수금액', summary.totalBuyAmount],
       ['총 매도금액', summary.totalSellAmount],
-      ['최종 보유수량', summary.finalShares],
-      ['최종 평균단가', Math.trunc(summary.finalAvgCost)],
-      ['최종 평가금액', Math.trunc(summary.finalEvalAmount)],
-      ['실현손익', Math.trunc(summary.realizedPnl)],
-      ['미실현손익', Math.trunc(summary.unrealizedPnl)],
-      ['총손익', Math.trunc(summary.totalPnl)],
+      ['총 거래수수료', Math.trunc(summary.totalTradeFee)],
+      ['총 운용수수료(보유세)', Math.trunc(summary.totalMgmtFee)],
+    ];
+
+    // 요약과 거래내역을 하나의 시트에 통합
+    const finalSheetData = [
+      ...summaryRows,
+      [], // 구분 공백 행
+      [], // 구분 공백 행
+      tradeLogHeader,
+      ...tradeLogRows
     ];
 
     const wb = XLSX.utils.book_new();
-    const wsLog = XLSX.utils.aoa_to_sheet([tradeLogHeader, ...tradeLogRows]);
-    const wsSummary = XLSX.utils.aoa_to_sheet([summaryHeader, ...summaryRows]);
-
-    wsLog['!cols'] = new Array(tradeLogHeader.length).fill({ wch: 15 });
-    wsSummary['!cols'] = [{ wch: 25 }, { wch: 20 }];
-
-    XLSX.utils.book_append_sheet(wb, wsLog, '거래내역');
-    XLSX.utils.book_append_sheet(wb, wsSummary, '요약');
+    const ws = XLSX.utils.aoa_to_sheet(finalSheetData);
+    ws['!cols'] = [{ wch: 25 }, { wch: 20 }]; // 요약 부분에 맞춰 컬럼 너비 설정
+    XLSX.utils.book_append_sheet(wb, ws, '시뮬레이션 결과');
 
     const now = new Date();
     const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
@@ -490,13 +565,51 @@
     const reportBox = document.getElementById(ID.reportBox);
     if (!reportBox) return;
 
-    if (series.length === 0 || summary.totalBuyAmount === 0) {
+    if (series.length === 0 || (summary.buyCount === 0 && summary.sellCount === 0)) {
       reportBox.innerHTML = `<p class="report-empty">리포트를 생성하려면 먼저 기본 설정과 거래 내역을 입력해주세요.</p>`;
       return;
     }
 
-    // ... (리포트 생성 로직 추가)
-    reportBox.innerHTML = `<p class="report-empty">리포트 생성 기능이 구현되지 않았습니다.</p>`;
+    const totalPnl = summary.totalPnl;
+    const roi = summary.maxInvested > 0 ? (totalPnl / summary.maxInvested) * 100 : 0;
+    const isProfit = totalPnl >= 0;
+
+    const html = `
+      <div class="report-summary">
+        <h4>단기매매 시뮬레이션 리포트</h4>
+        
+        <h5 class="report-subtitle">종합 성과</h5>
+        <table class="report-table">
+          <tr><td>총 손익 (실현+미실현)</td><td class="${isProfit ? 'val-pos' : 'val-neg'}">${formatNumber(totalPnl, 0)} 원</td></tr>
+          <tr><td>총 투자 수익률 (ROI)</td><td class="${isProfit ? 'val-pos' : 'val-neg'}">${roi.toFixed(2)}%</td></tr>
+          <tr><td>최대 투입 원금</td><td>${formatNumber(summary.maxInvested, 0)} 원</td></tr>
+        </table>
+
+        <h5 class="report-subtitle">거래 분석</h5>
+        <table class="report-table">
+          <tr><td>총 매수 횟수 / 금액</td><td>${summary.buyCount} 회 / ${formatNumber(summary.totalBuyAmount, 0)} 원</td></tr>
+          <tr><td>총 매도 횟수 / 금액</td><td>${summary.sellCount} 회 / ${formatNumber(summary.totalSellAmount, 0)} 원</td></tr>
+          <tr><td>승률 (실현 손익 기준)</td><td>${summary.winRate.toFixed(1)}% (${summary.winCount}승 ${summary.lossCount}패)</td></tr>
+          <tr><td>손익비 (실현 손익 기준)</td><td>${summary.plRatio.toFixed(2)} : 1</td></tr>
+          <tr><td>최대 이익 실현 거래</td><td class="val-pos">+${formatNumber(summary.maxWin, 0)} 원</td></tr>
+          <tr><td>최대 손실 실현 거래</td><td class="val-neg">${formatNumber(summary.maxLoss, 0)} 원</td></tr>
+        </table>
+
+        <h5 class="report-subtitle">비용 분석</h5>
+        <table class="report-table">
+          <tr><td>총 거래 수수료</td><td class="val-neg">-${formatNumber(summary.totalTradeFee, 0)} 원</td></tr>
+          <tr><td>총 운용 수수료 (보유세)</td><td class="val-neg">-${formatNumber(summary.totalMgmtFee, 0)} 원</td></tr>
+          <tr><td>총 발생 비용</td><td class="val-neg">-${formatNumber(summary.totalTradeFee + summary.totalMgmtFee, 0)} 원</td></tr>
+        </table>
+
+        <div class="report-narrative">
+          <p><strong>종합 분석:</strong> 총 <strong>${summary.buyCount + summary.sellCount}회</strong>의 거래를 통해 <strong>${formatNumber(totalPnl, 0)}원</strong>의 총 손익을 기록했습니다. 최대 투입 원금 대비 <strong>${roi.toFixed(2)}%</strong>의 수익률입니다. 총 발생 비용은 ${formatNumber(summary.totalTradeFee + summary.totalMgmtFee, 0)}원으로, 최종 손익에 영향을 주었습니다.</p>
+          <p><strong>거래 스타일:</strong> 실현 손익 기준 <strong>${summary.winRate.toFixed(1)}%</strong>의 승률을 보였으며, 평균 이익이 평균 손실보다 <strong>${summary.plRatio.toFixed(2)}배</strong> 큰 ${summary.plRatio >= 1 ? '손익비가 좋은' : '손익비가 좋지 않은'} 거래 패턴을 보였습니다. 이는 ${summary.plRatio >= 1 ? '수익을 길게 가져가고 손실을 짧게 끊는 전략이 유효했음을 시사합니다.' : '이익을 짧게 끊고 손실을 길게 가져가는 경향이 있어 개선이 필요해 보입니다.'}</p>
+          ${summary.finalShares > 0 ? `<p><strong>최종 상태:</strong> 현재 <strong>${formatNumber(summary.finalShares, 0)}주</strong>를 보유 중이며, <strong>${formatNumber(summary.unrealizedPnl, 0)}원</strong>의 미실현 손익이 있습니다.</p>` : '<p><strong>최종 상태:</strong> 모든 포지션이 청산되었습니다.</p>'}
+        </div>
+      </div>
+    `;
+    reportBox.innerHTML = html;
   }
 
   function downloadSimReport() {

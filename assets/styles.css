@@ -124,6 +124,11 @@
   .summary-box-small table td:last-child { text-align: right; font-weight: bold; color: var(--text); }
   .summary-box-small table td:first-child { color: var(--subtext); }
 
+  .summary-table-grid { width: 100%; font-size: 13px; border-collapse: collapse; }
+  .summary-table-grid td { padding: 6px 4px; border: none; text-align: left; }
+  .summary-table-grid td:nth-child(odd) { color: var(--subtext); width: 22%; }
+  .summary-table-grid td:nth-child(even) { font-weight: bold; color: var(--text); width: 28%; }
+
   .summary-box-large {
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -146,16 +151,26 @@
   .day-table th, .day-table td { border:1px solid var(--border); padding:8px; text-align:center; font-size:13px; }
   .day-table th { background:var(--th-bg); }
   .day-table input.dayReturnInput {
-    width:90px; text-align:right; padding:6px; font-size:13px; margin:0;
+    width:90px; text-align:right; padding:6px; font-size:13px; margin:0; -webkit-appearance: textfield;
   }
-  .day-table .buy-row {
-    background-color: var(--th-bg);
-  }
+  /* loss_recovery_sim.js 에서 사용하는 클래스 */
+  .day-table .buy-marker { background-color: var(--th-bg); }
+
   .day-table .val-pos { color:var(--pos); font-weight:bold; }
   .day-table .val-neg { color:var(--neg); font-weight:bold; }
   .day-table select { width: 100%; padding: 6px; font-size: 13px; }
+  .day-table select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.2em;
+    padding-right: 2rem;
+  }
   .day-table input:disabled { background: var(--th-bg); opacity: 0.7; }
-  .etf-price-cell { font-weight: bold; }
+  .leverage-price-cell { font-weight: bold; }
   .placeholder-cell {
     border: none !important;
     background: var(--card-bg) !important;
@@ -195,7 +210,20 @@
   .summary-table th, .summary-table td { border:1px solid var(--border); padding:8px 10px; text-align:right; font-size:13px;}
   .summary-table th { background:var(--th-bg); text-align:center;}
   .summary-table td:first-child, .summary-table th:first-child { text-align:left; }
-  .ad-slot { width:100%; text-align:center; margin:14px 0; }
+  .ad-slot {
+    width: 100%;
+    min-height: 100px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--th-bg);
+    color: var(--subtext);
+    font-size: 14px;
+    border-radius: 14px;
+  }
+  .ad-slot.top-ad {
+    margin-bottom: 16px;
+  }
   .api-note { font-size:12px; color:var(--subtext); }
 
   @media (max-width: 480px) {
@@ -288,6 +316,13 @@
   margin-bottom: 12px;
 }
 
+.report-subtitle {
+  font-size: 13px;
+  color: var(--subtext);
+  margin: 20px 0 8px 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
 .report-table {
   width: 100%;
   border-collapse: collapse;

@@ -16,9 +16,10 @@
     leverageSel: 'lossLeverageSel',
     leverageCustom: 'lossLeverageCustom',
     customLeverageWrap: 'lossCustomLeverageWrap',
+    tradeFeeRate: 'lossTradeFeeRate',
     feeRate: 'lossFeeRate',
     tableBody: 'lossTableBody',
-    etfRateHeader: 'lossEtfRateHeader',
+    leverageRateHeader: 'lossLeverageRateHeader',
     principalBox: 'lossPrincipalBox',
     summaryBox: 'lossSummaryBox',
     reportBox: 'lossReportBox',
@@ -68,11 +69,6 @@
     });
   }
 
-  function formatInputOnBlur(el, fractionDigits) {
-    const value = parseNum(el.value);
-    el.value = formatNumber(value, fractionDigits);
-  }
-
   function getSimLeverage() {
     const sel = document.getElementById(ID.leverageSel).value;
     if (sel === 'custom') {
@@ -85,6 +81,12 @@
     const el = document.getElementById(ID.feeRate);
     const annualFee = el ? parseNum(el.value) : 0;
     return (annualFee / 100) / 365;
+  }
+
+  function getSimTradeFee() {
+    const el = document.getElementById(ID.tradeFeeRate);
+    const tradeFee = el ? parseNum(el.value) : 0;
+    return tradeFee / 100;
   }
 
   function onLeverageSelChange() {
@@ -116,6 +118,9 @@
     const feeEl = document.getElementById(ID.feeRate);
     if (feeEl) feeEl.value = '';
 
+    const tradeFeeEl = document.getElementById(ID.tradeFeeRate);
+    if (tradeFeeEl) tradeFeeEl.value = '';
+
     addSimRow();
     addSimRow();
     addSimRow();
@@ -125,68 +130,73 @@
   function onSimFieldInput(idx, field, el) {
     onSimNumInput(el);
     simRows[idx] = { field, value: el.value };
-    updateOtherCells(idx, field);
-    simRows[idx] = { field, value: parseNum(el.value) };
+    // onblur 이벤트에서 renderSimTable()이 호출되므로 여기서는 update하지 않습니다.
+  }
+
+  function formatInputOnBlur(el, fractionDigits) {
+    const value = parseNum(el.value);
+    el.value = formatNumber(value, fractionDigits);
+    renderSimTable();
   }
 
   // 계산 내부는 반올림하지 않고 실수로 유지, 화면/엑셀 출력 시에만 Math.trunc/formatNumber 적용.
-  function computeRowValues(field, value, prevClose, prevEtfPrice, leverage, dailyFee, shares, principal) {
-    let underlyingRate, etfRate, etfPrice, delta;
+  function computeRowValues(field, value, prevClose, prevLeveragePrice, leverage, dailyFee, shares, principal) {
+    let underlyingRate, leverageRate, leveragePrice, delta;
 
     if (field === 'delta') {
       delta = value;
       underlyingRate = prevClose ? (delta / prevClose) * 100 : 0;
-      etfRate = underlyingRate * leverage;
-      etfPrice = prevEtfPrice * (1 + etfRate / 100 - dailyFee);
+      leverageRate = underlyingRate * leverage;
+      leveragePrice = prevLeveragePrice * (1 + leverageRate / 100 - dailyFee);
     } else if (field === 'underlyingRate') {
       underlyingRate = value;
       delta = prevClose * underlyingRate / 100;
-      etfRate = underlyingRate * leverage;
-      etfPrice = prevEtfPrice * (1 + etfRate / 100 - dailyFee);
-    } else if (field === 'etfRate') {
-      etfRate = value;
-      underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
+      leverageRate = underlyingRate * leverage;
+      leveragePrice = prevLeveragePrice * (1 + leverageRate / 100 - dailyFee);
+    } else if (field === 'leverageRate') {
+      leverageRate = value;
+      underlyingRate = leverage !== 0 ? leverageRate / leverage : 0;
       delta = prevClose * underlyingRate / 100;
-      etfPrice = prevEtfPrice * (1 + etfRate / 100 - dailyFee);
-    } else if (field === 'etfPrice') {
-      etfPrice = value;
-      etfRate = prevEtfPrice !== 0 ? ((etfPrice / prevEtfPrice) - 1 + dailyFee) * 100 : 0;
-      underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
+      leveragePrice = prevLeveragePrice * (1 + leverageRate / 100 - dailyFee);
+    } else if (field === 'leveragePrice') {
+      leveragePrice = value;
+      leverageRate = prevLeveragePrice !== 0 ? ((leveragePrice / prevLeveragePrice) - 1 + dailyFee) * 100 : 0;
+      underlyingRate = leverage !== 0 ? leverageRate / leverage : 0;
       delta = prevClose * underlyingRate / 100;
     } else if (field === 'evalAmount') {
       const evalAmount = value;
-      etfPrice = shares !== 0 ? evalAmount / shares : 0;
-      etfRate = prevEtfPrice !== 0 ? ((etfPrice / prevEtfPrice) - 1 + dailyFee) * 100 : 0;
-      underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
+      leveragePrice = shares !== 0 ? evalAmount / shares : 0;
+      leverageRate = prevLeveragePrice !== 0 ? ((leveragePrice / prevLeveragePrice) - 1 + dailyFee) * 100 : 0;
+      underlyingRate = leverage !== 0 ? leverageRate / leverage : 0;
       delta = prevClose * underlyingRate / 100;
     } else if (field === 'pnl') {
       const pnl = value;
       const evalAmount = pnl + principal;
-      etfPrice = shares !== 0 ? evalAmount / shares : 0;
-      etfRate = prevEtfPrice !== 0 ? ((etfPrice / prevEtfPrice) - 1 + dailyFee) * 100 : 0;
-      underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
+      leveragePrice = shares !== 0 ? evalAmount / shares : 0;
+      leverageRate = prevLeveragePrice !== 0 ? ((leveragePrice / prevLeveragePrice) - 1 + dailyFee) * 100 : 0;
+      underlyingRate = leverage !== 0 ? leverageRate / leverage : 0;
       delta = prevClose * underlyingRate / 100;
     } else if (field === 'pnlRate') {
       const pnlRate = value;
       const pnl = principal !== 0 ? (pnlRate / 100) * principal : 0;
       const evalAmount = pnl + principal;
-      etfPrice = shares !== 0 ? evalAmount / shares : 0;
-      etfRate = prevEtfPrice !== 0 ? ((etfPrice / prevEtfPrice) - 1 + dailyFee) * 100 : 0;
-      underlyingRate = leverage !== 0 ? etfRate / leverage : 0;
+      leveragePrice = shares !== 0 ? evalAmount / shares : 0;
+      leverageRate = prevLeveragePrice !== 0 ? ((leveragePrice / prevLeveragePrice) - 1 + dailyFee) * 100 : 0;
+      underlyingRate = leverage !== 0 ? leverageRate / leverage : 0;
       delta = prevClose * underlyingRate / 100;
     } else {
       delta = 0;
       underlyingRate = 0;
-      etfRate = 0;
-      etfPrice = prevEtfPrice;
+      leverageRate = 0;
+      leveragePrice = prevLeveragePrice;
     }
 
     const closePrice = prevClose + delta;
-    const evalAmount = etfPrice * shares;
+    const evalAmount = leveragePrice * shares;
     const pnl = evalAmount - principal;
     const pnlRate = principal !== 0 ? (pnl / principal) * 100 : 0;
 
-    return { delta, underlyingRate, etfRate, etfPrice, closePrice, evalAmount, pnl, pnlRate };
+    return { delta, underlyingRate, leverageRate, leveragePrice, closePrice, evalAmount, pnl, pnlRate };
   }
 
   function renderSimTable() {
@@ -197,101 +207,78 @@
     const dailyFee = getSimDailyFee();
     const buyPrice = parseNum(document.getElementById(ID.buyPrice).value);
     const shares = parseNum(document.getElementById(ID.shares).value);
-    const principal = buyPrice * shares;
+    const tradeFee = getSimTradeFee();
+    const grossAmount = buyPrice * shares;
+    const principal = grossAmount * (1 + tradeFee);
 
-    document.getElementById(ID.etfRateHeader).textContent = `ETF 등락률(${leverage}배)(%)`;
+    document.getElementById(ID.leverageRateHeader).textContent = `레버리지 등락률(${leverage}배)(%)`;
     document.getElementById(ID.principalBox).value =
-      principal > 0 ? `${principal.toLocaleString('ko-KR')} 원` : '';
+      principal > 0 ? `${Math.trunc(principal).toLocaleString('ko-KR')} 원` : '';
 
     const summaryBox = document.getElementById(ID.summaryBox);
     const annualFee = parseNum(document.getElementById(ID.feeRate).value);
     summaryBox.innerHTML = `
-      <h4>매수 정보 요약</h4>
-      <table>
-        <tr><td>매수 가격</td><td>${buyPrice.toLocaleString('ko-KR')} 원</td></tr>
-        <tr><td>매수 수량</td><td>${shares.toLocaleString('ko-KR')} 주</td></tr>
-        <tr><td>매수 원금</td><td>${principal.toLocaleString('ko-KR')} 원</td></tr>
-        <tr><td>레버리지</td><td>${leverage} 배</td></tr>
-        <tr><td>연 운용수수료</td><td>${annualFee.toFixed(2)} %</td></tr>
+      <table class="summary-table-grid">
+        <tr><td>매수 가격</td><td>${formatNumber(buyPrice, 0)} 원</td>
+            <td>레버리지 시작가</td><td>${formatNumber(buyPrice, 0)} 원</td></tr>
+        <tr><td>매수 수량</td><td>${formatNumber(shares, 0)} 주</td>
+            <td>초기 평가금액</td><td>${formatNumber(buyPrice * shares, 0)} 원</td></tr>
+        <tr><td>매수 원금(수수료포함)</td><td>${formatNumber(principal, 0)} 원</td>
+            <td>레버리지</td><td>${leverage} 배</td></tr>
+        <tr><td>연 운용수수료</td><td>${annualFee.toFixed(2)} %</td>
+            <td>거래 수수료</td><td>${(tradeFee * 100).toFixed(4)} %</td></tr>
       </table>
     `;
 
     let prevClose = buyPrice;
-    let prevEtfPrice = buyPrice;
+    let prevLeveragePrice = buyPrice;
 
     simRows.forEach((row, idx) => {
+      // render 시점에 value가 문자열일 수 있으므로 숫자로 변환
+      if (row.value) {
+        row.value = parseNum(row.value);
+      }
       let vals;
       if (idx === 0) {
-        vals = { delta: 0, underlyingRate: 0, etfRate: 0, etfPrice: buyPrice, closePrice: buyPrice, evalAmount: buyPrice * shares, pnl: 0, pnlRate: 0 };
+        vals = { delta: 0, underlyingRate: 0, leverageRate: 0, leveragePrice: buyPrice, closePrice: buyPrice, evalAmount: buyPrice * shares, pnl: 0, pnlRate: 0 };
       } else {
-        vals = computeRowValues(row.field, row.value, prevClose, prevEtfPrice, leverage, dailyFee, shares, principal);
+        vals = computeRowValues(row.field, row.value, prevClose, prevLeveragePrice, leverage, dailyFee, shares, principal);
       }
       prevClose = vals.closePrice;
-      prevEtfPrice = vals.etfPrice;
+      prevLeveragePrice = vals.leveragePrice;
 
       const rateCls = vals.underlyingRate >= 0 ? 'val-pos' : 'val-neg';
-      const etfCls = vals.etfRate >= 0 ? 'val-pos' : 'val-neg';
+      const leverageCls = vals.leverageRate >= 0 ? 'val-pos' : 'val-neg';
       const pnlCls = vals.pnl >= 0 ? 'val-pos' : 'val-neg';
 
       const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="row-idx">${idx}</td>
-        <td><input type="text" class="dayReturnInput" data-field="delta" value="${formatNumber(row.field === 'delta' ? row.value : vals.delta, 0)}"
-          oninput="lossRecoverySim.onFieldInput(${idx}, 'delta', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 0)"></td>
-        <td class="${rateCls}"><input type="text" class="dayReturnInput" data-field="underlyingRate" value="${formatNumber(row.field === 'underlyingRate' ? row.value : vals.underlyingRate, 2)}"
-          oninput="lossRecoverySim.onFieldInput(${idx}, 'underlyingRate', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 2)"></td>
-        <td class="${etfCls}"><input type="text" class="dayReturnInput" data-field="etfRate" value="${formatNumber(row.field === 'etfRate' ? row.value : vals.etfRate, 2)}"
-          oninput="lossRecoverySim.onFieldInput(${idx}, 'etfRate', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 2)"></td>
-        <td><input type="text" class="dayReturnInput" data-field="etfPrice" value="${formatNumber(row.field === 'etfPrice' ? row.value : Math.trunc(vals.etfPrice), 0)}"
-          oninput="lossRecoverySim.onFieldInput(${idx}, 'etfPrice', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 0)"></td>
-        <td><input type="text" class="dayReturnInput" data-field="evalAmount" value="${formatNumber(row.field === 'evalAmount' ? row.value : Math.trunc(vals.evalAmount), 0)}"
-          oninput="lossRecoverySim.onFieldInput(${idx}, 'evalAmount', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 0)"></td>
-        <td class="${pnlCls}"><input type="text" class="dayReturnInput" data-field="pnl" value="${formatNumber(row.field === 'pnl' ? row.value : Math.trunc(vals.pnl), 0)}"
-          oninput="lossRecoverySim.onFieldInput(${idx}, 'pnl', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 0)"></td>
-        <td class="${pnlCls}"><input type="text" class="dayReturnInput" data-field="pnlRate" value="${formatNumber(row.field === 'pnlRate' ? row.value : vals.pnlRate, 2)}"
-          oninput="lossRecoverySim.onFieldInput(${idx}, 'pnlRate', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 2)"></td>
-        <td><button class="del-btn" onclick="lossRecoverySim.removeRow(${idx})">삭제</button></td>
-      `;
+      if (idx === 0) {
+        tr.innerHTML = `
+          <td class="row-idx buy-marker">매수</td>
+          <td>-</td>
+          <td>-</td>
+          <td>-</td>
+          <td>${formatNumber(vals.leveragePrice, 0)}</td>
+          <td>${formatNumber(vals.evalAmount, 0)}</td>
+          <td class="val-pos">${formatNumber(vals.pnl, 0)}</td>
+          <td class="val-pos">${formatNumber(vals.pnlRate, 2)}</td>
+          <td><button class="del-btn" onclick="lossRecoverySim.removeRow(${idx})" disabled>삭제</button></td>
+        `;
+      } else {
+        tr.innerHTML = `
+          <td class="row-idx">${idx}</td>
+          <td><input type="text" class="dayReturnInput" data-field="delta" value="${formatNumber(row.field === 'delta' ? row.value : vals.delta, 0)}" oninput="lossRecoverySim.onFieldInput(${idx}, 'delta', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 0)" onkeydown="if(event.key==='Enter') this.blur()"></td>
+          <td class="${rateCls}"><input type="text" class="dayReturnInput" data-field="underlyingRate" value="${formatNumber(row.field === 'underlyingRate' ? row.value : vals.underlyingRate, 2)}" oninput="lossRecoverySim.onFieldInput(${idx}, 'underlyingRate', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 2)" onkeydown="if(event.key==='Enter') this.blur()"></td>
+          <td class="${leverageCls}"><input type="text" class="dayReturnInput" data-field="leverageRate" value="${formatNumber(row.field === 'leverageRate' ? row.value : vals.leverageRate, 2)}" oninput="lossRecoverySim.onFieldInput(${idx}, 'leverageRate', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 2)" onkeydown="if(event.key==='Enter') this.blur()"></td>
+          <td><input type="text" class="dayReturnInput" data-field="leveragePrice" value="${formatNumber(row.field === 'leveragePrice' ? row.value : Math.trunc(vals.leveragePrice), 0)}" oninput="lossRecoverySim.onFieldInput(${idx}, 'leveragePrice', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 0)" onkeydown="if(event.key==='Enter') this.blur()"></td>
+          <td><input type="text" class="dayReturnInput" data-field="evalAmount" value="${formatNumber(row.field === 'evalAmount' ? row.value : Math.trunc(vals.evalAmount), 0)}" oninput="lossRecoverySim.onFieldInput(${idx}, 'evalAmount', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 0)" onkeydown="if(event.key==='Enter') this.blur()"></td>
+          <td class="${pnlCls}"><input type="text" class="dayReturnInput" data-field="pnl" value="${formatNumber(row.field === 'pnl' ? row.value : Math.trunc(vals.pnl), 0)}" oninput="lossRecoverySim.onFieldInput(${idx}, 'pnl', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 0)" onkeydown="if(event.key==='Enter') this.blur()"></td>
+          <td class="${pnlCls}"><input type="text" class="dayReturnInput" data-field="pnlRate" value="${formatNumber(row.field === 'pnlRate' ? row.value : vals.pnlRate, 2)}" oninput="lossRecoverySim.onFieldInput(${idx}, 'pnlRate', this)" onfocus="this.select()" onblur="lossRecoverySim.formatBlur(this, 2)" onkeydown="if(event.key==='Enter') this.blur()"></td>
+          <td><button class="del-btn" onclick="lossRecoverySim.removeRow(${idx})">삭제</button></td>
+        `;
+      }
       tbody.appendChild(tr);
     });
-  }
-
-  function updateOtherCells(changedRowIndex, changedField) {
-    const buyPrice = parseNum(document.getElementById(ID.buyPrice).value);
-    const shares = parseNum(document.getElementById(ID.shares).value);
-    const leverage = getSimLeverage();
-    const dailyFee = getSimDailyFee();
-    const principal = buyPrice * shares;
-
-    let prevClose = buyPrice;
-    let prevEtfPrice = buyPrice;
-
-    for (let i = 1; i < simRows.length; i++) {
-      const rowData = simRows[i];
-      const valueToUse = (i === changedRowIndex) ? parseNum(rowData.value) : rowData.value;
-      const fieldToUse = (i === changedRowIndex) ? changedField : rowData.field;
-
-      const vals = computeRowValues(fieldToUse, valueToUse, prevClose, prevEtfPrice, leverage, dailyFee, shares, principal);
-
-      if (i !== changedRowIndex) {
-        const rowEl = document.getElementById(ID.tableBody).children[i - 1];
-        if (rowEl) {
-          const inputs = rowEl.querySelectorAll('input.dayReturnInput');
-          inputs.forEach((input) => {
-            const field = input.dataset.field;
-            if (field !== changedField || i !== changedRowIndex) {
-              const fractionDigits = ['underlyingRate', 'etfRate', 'pnlRate'].includes(field) ? 2 : 0;
-              const rawVal = (field === 'etfPrice' || field === 'evalAmount' || field === 'pnl')
-                ? Math.trunc(vals[field]) : vals[field];
-              input.value = formatNumber(rawVal, fractionDigits);
-            }
-          });
-        }
-      }
-
-      prevClose = vals.closePrice;
-      prevEtfPrice = vals.etfPrice;
-    }
   }
 
   function recalcSim() {
@@ -307,22 +294,24 @@
     const dailyFee = getSimDailyFee();
     const buyPrice = parseNum(document.getElementById(ID.buyPrice).value);
     const shares = parseNum(document.getElementById(ID.shares).value);
-    const principal = buyPrice * shares;
+    const tradeFee = getSimTradeFee();
+    const grossAmount = buyPrice * shares;
+    const principal = grossAmount * (1 + tradeFee);
 
     let prevClose = buyPrice;
-    let prevEtfPrice = buyPrice;
+    let prevLeveragePrice = buyPrice;
 
     const series = [];
 
     simRows.forEach((row, idx) => {
       let vals;
       if (idx === 0) {
-        vals = { delta: 0, underlyingRate: 0, etfRate: 0, etfPrice: buyPrice, closePrice: buyPrice, evalAmount: buyPrice * shares, pnl: 0, pnlRate: 0 };
+        vals = { delta: 0, underlyingRate: 0, leverageRate: 0, leveragePrice: buyPrice, closePrice: buyPrice, evalAmount: buyPrice * shares, pnl: 0, pnlRate: 0 };
       } else {
-        vals = computeRowValues(row.field, row.value, prevClose, prevEtfPrice, leverage, dailyFee, shares, principal);
+        vals = computeRowValues(row.field, row.value, prevClose, prevLeveragePrice, leverage, dailyFee, shares, principal);
       }
       prevClose = vals.closePrice;
-      prevEtfPrice = vals.etfPrice;
+      prevLeveragePrice = vals.leveragePrice;
       series.push({ idx, ...vals });
     });
 
@@ -330,7 +319,7 @@
   }
 
   function exportSimExcel() {
-    const { series, buyPrice, shares, leverage, dailyFee, principal } = buildSimSeries();
+    const { series, buyPrice, shares, leverage, principal } = buildSimSeries();
     if (series.length === 0 || (typeof XLSX === 'undefined')) {
       alert('내보낼 데이터가 없거나 엑셀 라이브러리가 로드되지 않았습니다.');
       return;
@@ -342,23 +331,30 @@
       ['매수 원금', principal.toLocaleString('ko-KR')],
       ['레버리지', leverage],
       ['연 운용수수료(%)', annualFee.toFixed(2)],
+      ['거래 수수료(%)', (getSimTradeFee() * 100).toFixed(4)],
     ];
 
-    const tableHeader = ['일차', '변동가', '기초자산등락률(%)', `ETF등락률(${leverage}배)(%)`, 'ETF가격', '평가금액', '손익', '손익률(%)'];
+    const tableHeader = ['일차', '변동가', '기초자산등락률(%)', `레버리지등락률(${leverage}배)(%)`, '레버리지가격', '평가금액', '손익', '손익률(%)'];
     const tableRows = [tableHeader];
 
     series.forEach((s, idx) => {
-      if (idx === 0) return;
-      tableRows.push([
-        idx, s.delta.toFixed(0), s.underlyingRate.toFixed(2), s.etfRate.toFixed(2),
-        s.etfPrice.toFixed(0), s.evalAmount.toFixed(0), s.pnl.toFixed(0), s.pnlRate.toFixed(2),
-      ]);
+      if (idx === 0) {
+        tableRows.push([
+          '매수', '-', '-', '-',
+          s.leveragePrice.toFixed(0), s.evalAmount.toFixed(0), s.pnl.toFixed(0), s.pnlRate.toFixed(2),
+        ]);
+      } else {
+        tableRows.push([
+          idx, s.delta.toFixed(0), s.underlyingRate.toFixed(2), s.leverageRate.toFixed(2),
+          s.leveragePrice.toFixed(0), s.evalAmount.toFixed(0), s.pnl.toFixed(0), s.pnlRate.toFixed(2),
+        ]);
+      }
     });
 
     const finalSheetData = summaryData.concat(tableRows);
     const ws = XLSX.utils.aoa_to_sheet(finalSheetData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'ETF시뮬레이션');
+    XLSX.utils.book_append_sheet(wb, ws, '레버리지시뮬레이션');
 
     const now = new Date();
     const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
@@ -366,7 +362,7 @@
   }
 
   function generateSimReport() {
-    const { series, buyPrice, shares, leverage, dailyFee, principal } = buildSimSeries();
+    const { series, buyPrice, leverage, dailyFee, principal } = buildSimSeries();
     const reportBox = document.getElementById(ID.reportBox);
     if (!reportBox) return;
 
@@ -375,56 +371,77 @@
       return;
     }
 
+    const periodDays = series.length - 1;
     const last = series[series.length - 1];
     const underlyingCumRate = buyPrice !== 0 ? ((last.closePrice - buyPrice) / buyPrice) * 100 : 0;
-    const etfCumRate = buyPrice !== 0 ? ((last.etfPrice - buyPrice) / buyPrice) * 100 : 0;
-    const decayGap = (underlyingCumRate * leverage) - etfCumRate;
+    const leverageCumRate = buyPrice !== 0 ? ((last.leveragePrice - buyPrice) / buyPrice) * 100 : 0;
+    const decayGap = (underlyingCumRate * leverage) - leverageCumRate;
+
+    // --- 추가 지표 계산 ---
+    const leverageDailyReturns = series.slice(1).map(s => s.leverageRate / 100);
+    const avgDailyReturn = leverageDailyReturns.reduce((a, b) => a + b, 0) / periodDays;
+    const stdDev = periodDays > 1 ? Math.sqrt(leverageDailyReturns.map(r => Math.pow(r - avgDailyReturn, 2)).reduce((a, b) => a + b, 0) / (periodDays - 1)) : 0;
+    const annualizedReturn = Math.pow(1 + (leverageCumRate / 100), 252 / periodDays) - 1;
+    const annualizedVolatility = stdDev * Math.sqrt(252); // 일반적으로 연간 거래일수인 252를 사용
+    const sharpeRatio = annualizedVolatility !== 0 ? (annualizedReturn / annualizedVolatility) : 0; // 연환산 수익률을 샤프지수 계산에만 사용
+
+    const bestDay = Math.max(...leverageDailyReturns) * 100;
+    const worstDay = Math.min(...leverageDailyReturns) * 100;
 
     let underlyingPeak = buyPrice, underlyingMDD = 0, underlyingMddDay = 0;
-    let etfPeak = buyPrice, etfMDD = 0;
+    let leveragePeak = buyPrice, leverageMDD = 0;
     let mddDay = 0;
 
-    series.forEach((s) => {
+    series.slice(1).forEach((s) => {
       if (s.closePrice > underlyingPeak) underlyingPeak = s.closePrice;
       const uDD = underlyingPeak !== 0 ? ((s.closePrice - underlyingPeak) / underlyingPeak) * 100 : 0;
       if (uDD < underlyingMDD) { underlyingMDD = uDD; underlyingMddDay = s.idx; }
 
-      if (s.etfPrice > etfPeak) etfPeak = s.etfPrice;
-      const eDD = etfPeak !== 0 ? ((s.etfPrice - etfPeak) / etfPeak) * 100 : 0;
-      if (eDD < etfMDD) { etfMDD = eDD; mddDay = s.idx; }
+      if (s.leveragePrice > leveragePeak) leveragePeak = s.leveragePrice;
+      const lDD = leveragePeak !== 0 ? ((s.leveragePrice - leveragePeak) / leveragePeak) * 100 : 0;
+      if (lDD < leverageMDD) {
+        leverageMDD = lDD;
+        mddDay = s.idx;
+      }
     });
 
-    const requiredReboundRate = last.etfPrice !== 0 ? ((buyPrice / last.etfPrice) - 1) * 100 : 0;
+    const requiredReboundRate = last.leveragePrice !== 0 ? ((buyPrice / last.leveragePrice) - 1) * 100 : 0;
     const requiredUnderlyingRebound = leverage !== 0 ? requiredReboundRate / leverage : 0;
     const finalPnl = last.pnl;
     const finalPnlRate = last.pnlRate;
     const isProfit = finalPnl >= 0;
-    const annualFeeImpact = dailyFee * series.length * 100;
-
-    let riskLevel = '낮음';
-    if (Math.abs(etfMDD) >= 30) riskLevel = '매우 높음';
-    else if (Math.abs(etfMDD) >= 15) riskLevel = '높음';
-    else if (Math.abs(etfMDD) >= 5) riskLevel = '보통';
 
     const html = `
       <div class="report-summary">
-        <h4>${series.length - 1}일차 시뮬레이션 결과</h4>
+        <h4>${periodDays}일 투자 시뮬레이션 리포트</h4>
+        
+        <h5 class="report-subtitle">종합 성과 요약</h5>
         <table class="report-table">
-          <tr><td>현재 손익</td><td class="${isProfit ? 'val-pos' : 'val-neg'}">${finalPnl.toLocaleString('ko-KR', { maximumFractionDigits: 0 })} 원 (${finalPnlRate.toFixed(2)}%)</td></tr>
-          <tr><td>기초자산 누적 등락률</td><td class="${underlyingCumRate >= 0 ? 'val-pos' : 'val-neg'}">${underlyingCumRate.toFixed(2)}%</td></tr>
-          <tr><td>ETF(${leverage}배) 누적 등락률</td><td class="${etfCumRate >= 0 ? 'val-pos' : 'val-neg'}">${etfCumRate.toFixed(2)}%</td></tr>
-          <tr><td>레버리지 감쇠 효과(경로 의존성 손실)</td><td class="val-neg">-${Math.abs(decayGap).toFixed(2)}%p</td></tr>
-          <tr><td>ETF 최대낙폭(MDD)</td><td class="val-neg">${etfMDD.toFixed(2)}% (at ${mddDay}일차)</td></tr>
-          <tr><td>기초자산 최대낙폭(MDD)</td><td class="val-neg">${underlyingMDD.toFixed(2)}% (at ${underlyingMddDay}일차)</td></tr>
-          <tr><td>원금 회복에 필요한 ETF 상승률</td><td>${requiredReboundRate > 0 ? requiredReboundRate.toFixed(2) + '%' : '이미 회복(또는 초과 수익)'}</td></tr>
-          <tr><td>원금 회복에 필요한 기초자산 상승률</td><td>${requiredUnderlyingRebound > 0 ? requiredUnderlyingRebound.toFixed(2) + '%' : '-'}</td></tr>
-          <tr><td>수수료로 인한 대략적 손실 영향</td><td class="val-neg">-${annualFeeImpact.toFixed(2)}%</td></tr>
-          <tr><td>리스크 수준(MDD 기준)</td><td>${riskLevel}</td></tr>
+          <tr><td>최종 손익 (총 수익률)</td><td class="${isProfit ? 'val-pos' : 'val-neg'}">${finalPnl.toLocaleString('ko-KR', { maximumFractionDigits: 0 })} 원 (${finalPnlRate.toFixed(2)}%)</td></tr>
+          <tr><td>원금 회복에 필요한 레버리지 상승률</td><td>${requiredReboundRate > 0 ? requiredReboundRate.toFixed(2) + '%' : '이미 회복(또는 초과 수익)'}</td></tr>
         </table>
+
+        <h5 class="report-subtitle">위험 분석</h5>
+        <table class="report-table">
+          <tr><td>레버리지 최대낙폭(MDD)</td><td class="val-neg">${leverageMDD.toFixed(2)}% (at ${mddDay}일차)</td></tr>
+          <tr><td>변동성 (연환산)</td><td>${(annualizedVolatility * 100).toFixed(2)}%</td></tr>
+          <tr><td>샤프 지수 (위험 대비 성과)</td><td>${sharpeRatio.toFixed(2)}</td></tr>
+          <tr><td>최고의 날 (일일 최고 수익률)</td><td class="val-pos">+${bestDay.toFixed(2)}%</td></tr>
+          <tr><td>최악의 날 (일일 최저 수익률)</td><td class="val-neg">${worstDay.toFixed(2)}%</td></tr>
+        </table>
+
+        <h5 class="report-subtitle">경로 의존성 분석</h5>
+        <table class="report-table">
+          <tr><td>기초자산 누적 수익률</td><td class="${underlyingCumRate >= 0 ? 'val-pos' : 'val-neg'}">${underlyingCumRate.toFixed(2)}%</td></tr>
+          <tr><td>레버리지 누적 수익률</td><td class="${leverageCumRate >= 0 ? 'val-pos' : 'val-neg'}">${leverageCumRate.toFixed(2)}%</td></tr>
+          <tr><td>단순 기대 수익률 (기초 × ${leverage})</td><td>${(underlyingCumRate * leverage).toFixed(2)}%</td></tr>
+          <tr><td>변동성 끌림 (Decay)</td><td class="val-neg">-${Math.abs(decayGap).toFixed(2)}%p</td></tr>
+        </table>
+
         <div class="report-narrative">
-          <p>${series.length - 1}일 동안 기초자산은 ${underlyingCumRate.toFixed(2)}% ${underlyingCumRate >= 0 ? '상승' : '하락'}했으나, ${leverage}배 레버리지 ETF는 ${etfCumRate.toFixed(2)}% ${etfCumRate >= 0 ? '상승' : '하락'}했습니다. 이론적으로는 기초자산 등락률의 ${leverage}배(${(underlyingCumRate * leverage).toFixed(2)}%)가 되어야 하지만, 일일 재조정에 따른 경로 의존성(변동성 감쇠) 효과로 약 ${Math.abs(decayGap).toFixed(2)}%p의 차이가 발생했습니다.</p>
-          ${isProfit ? `<p>현재 평가 결과는 이익 상태이며, 손익률은 ${finalPnlRate.toFixed(2)}%입니다. 성공적인 투자 경로를 통해 원금 이상을 회복하고 초과 수익을 달성했습니다.</p>` : `<p>현재 평가 결과는 손실 상태이며, 손익률은 ${finalPnlRate.toFixed(2)}%입니다. ${requiredReboundRate > 0 ? `원금을 회복하려면 ETF가 추가로 ${requiredReboundRate.toFixed(2)}% 상승해야 하며, 이는 기초자산 기준으로 약 ${requiredUnderlyingRebound.toFixed(2)}% 상승에 해당합니다.` : ''}</p>`}
-          <p>시뮬레이션 기간 중 ETF는 ${mddDay}일차에 최대 ${Math.abs(etfMDD).toFixed(2)}%까지 낙폭을 기록했으며, 이는 기초자산 최대낙폭 ${Math.abs(underlyingMDD).toFixed(2)}%보다 ${Math.abs(etfMDD) > Math.abs(underlyingMDD) ? '더 큰' : '유사하거나 작은'} 수준입니다. 레버리지 ETF는 변동성이 큰 구간에서는 상승과 하락을 반복할수록 원금 회복이 더 어려워지는 구조적 특성이 있으므로, 장기 보유 시 이 감쇠 효과를 반드시 고려해야 합니다.</p>
+          <p><strong>종합 분석:</strong> ${periodDays}일의 투자 기간 동안, 최종 수익률은 <strong>${finalPnlRate.toFixed(2)}%</strong>를 기록했습니다. 위험 대비 성과를 나타내는 샤프 지수는 <strong>${sharpeRatio.toFixed(2)}</strong>로, 감수한 변동성 대비 ${sharpeRatio > 0.5 ? '준수한' : (sharpeRatio > 0 ? '다소 아쉬운' : '부진한')} 성과를 보였습니다.</p>
+          <p><strong>위험 및 변동성:</strong> 투자는 ${mddDay}일차에 <strong>${leverageMDD.toFixed(2)}%</strong>의 최대 낙폭(MDD)을 경험했으며, 이는 투자 기간 중 가장 큰 손실 구간을 의미합니다. 연환산 변동성은 <strong>${(annualizedVolatility * 100).toFixed(2)}%</strong>로, 가격 변동의 폭이 ${annualizedVolatility > 0.4 ? '매우 큰' : (annualizedVolatility > 0.2 ? '상당한' : '비교적 안정적인')} 수준이었음을 보여줍니다. (연간 거래일 252일 기준)</p>
+          <p><strong>레버리지 효과:</strong> 기초자산은 총 <strong>${underlyingCumRate.toFixed(2)}%</strong> ${underlyingCumRate >= 0 ? '상승' : '하락'}했지만, ${leverage}배 레버리지 상품은 <strong>${leverageCumRate.toFixed(2)}%</strong> ${leverageCumRate >= 0 ? '상승' : '하락'}했습니다. 단순 계산 기대치(${ (underlyingCumRate * leverage).toFixed(2)}%)와 실제 수익률의 차이인 '변동성 끌림(Decay)'은 <strong>-${Math.abs(decayGap).toFixed(2)}%p</strong>로 나타났습니다. 이는 일일 복리 계산 방식이 장기 수익률에 미치는 영향을 보여주며, 변동성이 큰 장세일수록 이 효과가 커지는 경향이 있습니다.</p>
         </div>
       </div>
     `;
