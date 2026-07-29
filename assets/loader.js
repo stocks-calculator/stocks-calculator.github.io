@@ -4,7 +4,7 @@
 
 const TABS = [
   { id: 'calculator', name: '주요 경제 지표', html: './pages/stock_info.html', js: './pages/stock_info.js', enabled: true },
-  { id: 'loss_recovery_sim', name: '장기투자 시뮬레이터', html: './pages/loss_recovery_sim.html', js: './pages/loss_recovery_sim.js', enabled: true },
+  { id: 'loss_recovery_sim', name: '레버리지 장기 보유 시뮬레이터', html: './pages/loss_recovery_sim.html', js: './pages/loss_recovery_sim.js', enabled: true },
   { id: 'short_term_sim', name: '단기매매 시뮬레이터', html: './pages/short_term_sim.html', js: './pages/short_term_sim.js', enabled: true },
   { id: 'disclaimer', name: '이용약관/면책조항', html: './pages/disclaimer.html', js: './pages/disclaimer.js', enabled: false },
   { id: 'privacy', name: '개인정보처리방침', html: './pages/privacy.html', js: './pages/privacy.js', enabled: false }
@@ -131,6 +131,7 @@ async function bootstrap(){
   if(tabToLoad) await activateTab(tabToLoad.id);
 
   await loadScriptOnce('https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js');
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/chart.js');
 
   // 하단 공통 광고 슬롯 추가
   const bottomAdSlot = document.createElement('div');
