@@ -3,7 +3,7 @@
 // ====================================================================
 
 const TABS = [
-  { id: 'calculator', name: '레버리지 계산기', html: './assets/calculator.html', js: './assets/calculator.js', enabled: true },
+  { id: 'calculator', name: '주요 경제 지표', html: './pages/stock_info.html', js: './pages/stock_info.js', enabled: true },
   { id: 'loss_recovery_sim', name: '장기투자 시뮬레이터', html: './pages/loss_recovery_sim.html', js: './pages/loss_recovery_sim.js', enabled: true },
   { id: 'short_term_sim', name: '단기매매 시뮬레이터', html: './pages/short_term_sim.html', js: './pages/short_term_sim.js', enabled: true },
   { id: 'disclaimer', name: '이용약관/면책조항', html: './pages/disclaimer.html', js: './pages/disclaimer.js', enabled: false },
@@ -91,6 +91,9 @@ async function activateTab(tabId){
     if (tabId === 'short_term_sim' && window.shortTermSim) {
       window.shortTermSim.init();
     }
+    if (tabId === 'calculator' && window.stockInfo) { // 'calculator' 탭이 이제 주식 정보 조회 페이지이므로, 새로운 JS 파일의 init 함수를 호출합니다.
+      window.stockInfo.init();
+    }
 
   }
 
@@ -163,8 +166,7 @@ async function bootstrap(){
   footer.style.color = 'var(--subtext)';
   footer.style.marginTop = '20px';
   footer.style.padding = '10px';
-  footer.textContent = `© 2026 Seungyun Yu. All rights reserved.
-본 사이트의 자체 제작 콘텐츠·소스코드·디자인의 무단 복제, 재배포 및 상업적 이용을 금지합니다.`;
+  footer.textContent = `© 2026 Seungyun Yu. All rights reserved.`;
   root.appendChild(footer);
 }
 
