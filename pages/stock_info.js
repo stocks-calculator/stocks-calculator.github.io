@@ -58,7 +58,8 @@ window.stockInfo = (function() {
     threeMonthsAgo.setMonth(today.getMonth() - 3);
 
     // 722Y001/0101000: CD 91일물 금리
-    const url = `https://ecos.bok.or.kr/api/StatisticSearch/${BOK_API_KEY}/json/kr/1/100/722Y001/D/${formatDate(threeMonthsAgo)}/${formatDate(today)}/0101000`;
+    const targetUrl = `https://ecos.bok.or.kr/api/StatisticSearch/${BOK_API_KEY}/json/kr/1/100/722Y001/D/${formatDate(threeMonthsAgo)}/${formatDate(today)}/0101000`;
+    const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
 
     const response = await fetch(url);
     const data = await response.json();
@@ -75,7 +76,8 @@ window.stockInfo = (function() {
   async function fetchFredRate() {
     if (!FRED_API_KEY || FRED_API_KEY === 'YOUR_FRED_API_KEY') throw new Error('FRED API 키 필요');
     // DFEDTARU: Federal Funds Target Range - Upper Limit
-    const url = `https://api.stlouisfed.org/fred/series/observations?series_id=DFEDTARU&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1`;
+    const targetUrl = `https://api.stlouisfed.org/fred/series/observations?series_id=DFEDTARU&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=1`;
+    const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
     const response = await fetch(url);
     const data = await response.json();
     const item = data?.observations?.[0];
@@ -90,7 +92,8 @@ window.stockInfo = (function() {
   /** 원/달러 환율 조회 */
   async function fetchExchangeRate() {
     if (!BOK_API_KEY || BOK_API_KEY === 'YOUR_BOK_API_KEY') throw new Error('한국은행 API 키 필요');
-    const url = `https://ecos.bok.or.kr/api/KeyStatisticList/${BOK_API_KEY}/json/kr/1/100`;
+    const targetUrl = `https://ecos.bok.or.kr/api/KeyStatisticList/${BOK_API_KEY}/json/kr/1/100`;
+    const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
     const response = await fetch(url);
     const data = await response.json();
     const item = data?.KeyStatisticList?.row?.find(
