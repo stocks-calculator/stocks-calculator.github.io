@@ -1,6 +1,9 @@
 <!-- ETF 단기 가격경로 시뮬레이터 - loader.js에서 tab-content로 로드 -->
-<h1>장기투자 시뮬레이터</h1>
-<p class="subtitle">매수 후 일자별 등락률/가격 경로에 따른 ETF 평가금액과 손익을 시뮬레이션합니다.</p>
+<h1>레버리지 장기 보유 시뮬레이터</h1>
+<p class="subtitle">매수 후 일자별 등락률/가격 경로에 따른 ETF 평가금액과 손익을 시뮬레이션합니다.
+  레버리지 ETF를 한 번 매수 후 장기간 보유할 경우, 일일 변동성에 따른 복리 효과와 변동성 끌림(Decay) 현상을 확인하는 용도의 시뮬레이터입니다.
+</p>
+
 
 <div class="card">
   <h3>1. 기본 설정</h3>
@@ -103,6 +106,9 @@
       <button class="add-btn" onclick="lossRecoverySim.generateReport()">리포트 생성</button>
       <button class="excel-btn" onclick="lossRecoverySim.downloadReport()">리포트 다운로드</button>
     </div>
+  </div>
+  <div class="chart-container" style="position: relative; height:300px; width:95%; margin: 20px auto; display: none;">
+    <canvas id="lossReportChart"></canvas>
   </div>
   <div id="lossReportBox" class="report-box">
     <p class="report-empty">리포트를 생성하려면 먼저 기본 설정(매수 가격, 매수 수량)과 일자별 시뮬레이션 데이터를 입력해주세요.</p>

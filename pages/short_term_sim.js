@@ -18,6 +18,7 @@
     summaryBox: 'shortSummaryBox',
     reportBox: 'shortReportBox',
   };
+  const STORAGE_KEY = 'shortTermSimState';
 
   let simRows = [];
 
@@ -65,7 +66,12 @@
 
   function formatInputOnBlur(el, fractionDigits) {
     const value = parseNum(el.value);
-    el.value = formatNumber(value, fractionDigits);
+    // 0을 입력하고 포커스를 잃었을 때 0으로 유지되도록 수정
+    if (el.value.trim() === '0' || el.value.trim() === '0.') {
+      el.value = '0';
+    } else {
+      el.value = formatNumber(value, fractionDigits);
+    }
   }
 
   function getSimLeverage() {
@@ -117,6 +123,7 @@
     document.getElementById(ID.leverageSel).value = '2';
     document.getElementById(ID.leverageCustom).value = '';
     document.getElementById(ID.customLeverageWrap).style.display = 'none';
+    localStorage.removeItem(STORAGE_KEY);
 
     const feeEl = document.getElementById(ID.feeRate);
     if (feeEl) feeEl.value = '';
@@ -201,6 +208,26 @@
     };
   }
 
+  function validateRow(row, el) {
+    let isValid = true;
+    const priceInput = el.querySelector('[data-field="price"]');
+    const sharesInput = el.querySelector('[data-field="shares"]');
+
+    if (row.type === 'buy' || row.type === 'sell') {
+      if (priceInput) {
+        priceInput.classList.toggle('input-error', row.price <= 0);
+        if (row.price <= 0) isValid = false;
+      }
+      if (sharesInput) {
+        sharesInput.classList.toggle('input-error', row.shares <= 0);
+        if (row.shares <= 0) isValid = false;
+      }
+    } else { // hold
+      if (priceInput) priceInput.classList.remove('input-error');
+      if (sharesInput) sharesInput.classList.remove('input-error');
+    }
+    return isValid;
+  }
   // 매도 1행의 손익 계산을 화면/시리즈에서 공통으로 사용.
   function applySellStep({ row, avgCost, totalShares, totalInvested, tradeFee, currentLeveragePrice }) {
     const sellShares = Math.min(row.shares, totalShares);
@@ -248,6 +275,7 @@
 
     let avgCost = 0, totalShares = 0, currentLeveragePrice = 0, totalInvested = 0;
     let realizedPnl = 0;
+    let isOverallValid = true;
 
     simRows.forEach((row, idx) => {
       const step = idx + 1;
@@ -327,6 +355,8 @@
         ${resultCells}
         <td><button class="del-btn" onclick="shortTermSim.removeRow(${idx})">삭제</button></td>
       `;
+
+      isOverallValid &= validateRow(row, tr);
       tbody.appendChild(tr);
     });
 
@@ -351,6 +381,7 @@
         <tr><td>총 손익</td><td colspan="3" class="summary-value total-pnl ${totalPnl >= 0 ? 'val-pos' : 'val-neg'}">${formatNumber(totalPnl, 0)} 원</td></tr>
       </table>
     `;
+    saveState();
   }
 
   function updateOtherCells(rowIndex, currentField) {
@@ -391,6 +422,31 @@
       if (el) onSimNumInput(el);
     });
     renderSimTable();
+  }
+
+  function saveState() {
+    const state = {
+      leverageSel: document.getElementById(ID.leverageSel).value,
+      leverageCustom: document.getElementById(ID.leverageCustom).value,
+      feeRate: document.getElementById(ID.feeRate).value,
+      tradeFeeRate: document.getElementById(ID.tradeFeeRate).value,
+      simRows: simRows,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function loadState() {
+    const savedState = localStorage.getItem(STORAGE_KEY);
+    if (!savedState) return false;
+
+    const state = JSON.parse(savedState);
+    document.getElementById(ID.leverageSel).value = state.leverageSel || '2';
+    document.getElementById(ID.leverageCustom).value = state.leverageCustom || '';
+    document.getElementById(ID.feeRate).value = state.feeRate || '';
+    document.getElementById(ID.tradeFeeRate).value = state.tradeFeeRate || '';
+    simRows = state.simRows || [];
+    onLeverageSelChange(); // UI 갱신 및 재계산
+    return true;
   }
 
   function buildSimSeries() {
@@ -498,6 +554,11 @@
   }
 
   function exportSimExcel() {
+    if (document.querySelector('.input-error')) {
+      alert('입력값을 확인해주세요. 빨간색으로 표시된 필드에 유효한 값을 입력해야 합니다.');
+      return;
+    }
+
     const { series, summary } = buildSimSeries();
     if (series.length === 0 || (typeof XLSX === 'undefined')) {
       alert('내보낼 데이터가 없거나 엑셀 라이브러리가 로드되지 않았습니다.');
@@ -561,6 +622,11 @@
   }
 
   function generateSimReport() {
+    if (document.querySelector('.input-error')) {
+      alert('리포트를 생성하려면 먼저 유효한 값을 모두 입력해주세요.');
+      return;
+    }
+
     const { series, summary } = buildSimSeries();
     const reportBox = document.getElementById(ID.reportBox);
     if (!reportBox) return;
@@ -613,6 +679,11 @@
   }
 
   function downloadSimReport() {
+    if (document.querySelector('.input-error')) {
+      alert('리포트를 다운로드하려면 먼저 유효한 값을 모두 입력해주세요.');
+      return;
+    }
+
     const reportBox = document.getElementById(ID.reportBox);
     if (!reportBox || !reportBox.innerText.trim()) {
       alert('먼저 리포트를 생성해주세요.');
@@ -630,8 +701,15 @@
     URL.revokeObjectURL(url);
   }
 
+  function initSim() {
+    // 저장된 상태가 있으면 불러오고, 없으면 초기화합니다.
+    if (!loadState()) {
+      resetSim();
+    }
+  }
+
   window.shortTermSim = {
-    init: resetSim,
+    init: initSim,
     reset: resetSim,
     addRow: addSimRow,
     removeRow: removeSimRow,

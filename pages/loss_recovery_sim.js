@@ -7,6 +7,7 @@
 // - 화면 계산과 buildSimSeries()의 hold(targetPrice) 로직을 공통 함수로 통일
 // - 중간 계산의 불필요한 Math.trunc() 제거, 출력 시에만 반올림
 // ====================================================================
+
 (function () {
   'use strict';
   const DAYS_PER_YEAR = 365;
@@ -23,8 +24,11 @@
     principalBox: 'lossPrincipalBox',
     summaryBox: 'lossSummaryBox',
     reportBox: 'lossReportBox',
+    reportChart: 'lossReportChart',
   };
+  const STORAGE_KEY = 'lossRecoverySimState';
 
+  let reportChartInstance = null;
   let simRows = [];
 
   function onSimNumInput(el) {
@@ -114,8 +118,15 @@
     document.getElementById(ID.leverageSel).value = '2';
     document.getElementById(ID.leverageCustom).value = '';
     document.getElementById(ID.customLeverageWrap).style.display = 'none';
+    document.getElementById(ID.reportBox).innerHTML = `<p class="report-empty">리포트를 생성하려면 먼저 기본 설정(매수 가격, 매수 수량)과 일자별 시뮬레이션 데이터를 입력해주세요.</p>`;
+    const chartContainer = document.querySelector('.chart-container');
+    if (chartContainer) chartContainer.style.display = 'none';
+    if (reportChartInstance) {
+      reportChartInstance.destroy();
+    }
 
     const feeEl = document.getElementById(ID.feeRate);
+    localStorage.removeItem(STORAGE_KEY);
     if (feeEl) feeEl.value = '';
 
     const tradeFeeEl = document.getElementById(ID.tradeFeeRate);
@@ -135,7 +146,12 @@
 
   function formatInputOnBlur(el, fractionDigits) {
     const value = parseNum(el.value);
-    el.value = formatNumber(value, fractionDigits);
+    // 0을 입력하고 포커스를 잃었을 때 0으로 유지되도록 수정
+    if (el.value.trim() === '0' || el.value.trim() === '0.') {
+      el.value = '0';
+    } else {
+      el.value = formatNumber(value, fractionDigits);
+    }
     renderSimTable();
   }
 
@@ -199,6 +215,12 @@
     return { delta, underlyingRate, leverageRate, leveragePrice, closePrice, evalAmount, pnl, pnlRate };
   }
 
+  function validateInputs() {
+    let isValid = true;
+    isValid &= validateField(ID.buyPrice, (val) => val > 0, '매수 가격은 0보다 커야 합니다.');
+    isValid &= validateField(ID.shares, (val) => val > 0, '매수 수량은 0보다 커야 합니다.');
+    return !!isValid;
+  }
   function renderSimTable() {
     const tbody = document.getElementById(ID.tableBody);
     tbody.innerHTML = '';
@@ -210,6 +232,8 @@
     const tradeFee = getSimTradeFee();
     const grossAmount = buyPrice * shares;
     const principal = grossAmount * (1 + tradeFee);
+
+    validateInputs(); // 입력값 유효성 검사 및 UI 피드백
 
     document.getElementById(ID.leverageRateHeader).textContent = `레버리지 등락률(${leverage}배)(%)`;
     document.getElementById(ID.principalBox).value =
@@ -279,6 +303,7 @@
       }
       tbody.appendChild(tr);
     });
+    saveState();
   }
 
   function recalcSim() {
@@ -289,6 +314,49 @@
     renderSimTable();
   }
 
+  function saveState() {
+    const state = {
+      buyPrice: document.getElementById(ID.buyPrice).value,
+      shares: document.getElementById(ID.shares).value,
+      leverageSel: document.getElementById(ID.leverageSel).value,
+      leverageCustom: document.getElementById(ID.leverageCustom).value,
+      feeRate: document.getElementById(ID.feeRate).value,
+      tradeFeeRate: document.getElementById(ID.tradeFeeRate).value,
+      simRows: simRows,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function loadState() {
+    const savedState = localStorage.getItem(STORAGE_KEY);
+    if (!savedState) return false;
+
+    const state = JSON.parse(savedState);
+    document.getElementById(ID.buyPrice).value = state.buyPrice || '';
+    document.getElementById(ID.shares).value = state.shares || '';
+    document.getElementById(ID.leverageSel).value = state.leverageSel || '2';
+    document.getElementById(ID.leverageCustom).value = state.leverageCustom || '';
+    document.getElementById(ID.feeRate).value = state.feeRate || '';
+    document.getElementById(ID.tradeFeeRate).value = state.tradeFeeRate || '';
+    simRows = state.simRows || [];
+    onLeverageSelChange(); // UI 갱신 및 재계산
+    return true;
+  }
+
+  function validateField(elementId, condition, message) {
+    const el = document.getElementById(elementId);
+    if (!el) return true;
+    const value = parseNum(el.value);
+    if (condition(value)) {
+      el.classList.remove('input-error');
+      el.title = '';
+      return true;
+    } else {
+      el.classList.add('input-error');
+      el.title = message;
+      return false;
+    }
+  }
   function buildSimSeries() {
     const leverage = getSimLeverage();
     const dailyFee = getSimDailyFee();
@@ -319,6 +387,11 @@
   }
 
   function exportSimExcel() {
+    if (!validateInputs()) {
+      alert('입력값을 확인해주세요. 빨간색으로 표시된 필드에 유효한 값을 입력해야 합니다.');
+      return;
+    }
+
     const { series, buyPrice, shares, leverage, principal } = buildSimSeries();
     if (series.length === 0 || (typeof XLSX === 'undefined')) {
       alert('내보낼 데이터가 없거나 엑셀 라이브러리가 로드되지 않았습니다.');
@@ -361,7 +434,68 @@
     XLSX.writeFile(wb, `장기시뮬_${timestamp}.xlsx`);
   }
 
+  function renderReportChart(series, buyPrice, leverage) {
+    const chartContainer = document.querySelector('.chart-container');
+    if (!chartContainer) return;
+
+    const ctx = document.getElementById(ID.reportChart).getContext('2d');
+    if (!ctx) return;
+
+    chartContainer.style.display = 'block';
+
+    if (reportChartInstance) {
+      reportChartInstance.destroy();
+    }
+
+    const labels = series.map(s => `${s.idx}일차`);
+    const underlyingData = series.map(s => buyPrice !== 0 ? ((s.closePrice - buyPrice) / buyPrice) * 100 : 0);
+    const leverageData = series.map(s => buyPrice !== 0 ? ((s.leveragePrice - buyPrice) / buyPrice) * 100 : 0);
+    const simpleData = underlyingData.map(rate => rate * leverage);
+
+    reportChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '레버리지 누적 수익률 (%)',
+          data: leverageData,
+          borderColor: 'rgba(255, 99, 132, 1)',
+          backgroundColor: 'rgba(255, 99, 132, 0.2)',
+          borderWidth: 2,
+          fill: false,
+          tension: 0.1
+        }, {
+          label: `단순 기대 수익률 (기초 × ${leverage}) (%)`,
+          data: simpleData,
+          borderColor: 'rgba(54, 162, 235, 1)',
+          backgroundColor: 'rgba(54, 162, 235, 0.2)',
+          borderWidth: 1.5,
+          borderDash: [5, 5],
+          fill: false,
+          tension: 0.1
+        }, {
+          label: '기초자산 누적 수익률 (%)',
+          data: underlyingData,
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          borderWidth: 1,
+          fill: false,
+          tension: 0.1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { ticks: { callback: value => `${value.toFixed(1)}%` } } }
+      }
+    });
+  }
   function generateSimReport() {
+    if (!validateInputs()) {
+      alert('리포트를 생성하려면 먼저 유효한 값을 모두 입력해주세요.');
+      return;
+    }
+
     const { series, buyPrice, leverage, dailyFee, principal } = buildSimSeries();
     const reportBox = document.getElementById(ID.reportBox);
     if (!reportBox) return;
@@ -370,6 +504,8 @@
       reportBox.innerHTML = `<p class="report-empty">리포트를 생성하려면 매수 정보와 일자별 데이터를 입력해주세요.</p>`;
       return;
     }
+
+    renderReportChart(series, buyPrice, leverage);
 
     const periodDays = series.length - 1;
     const last = series[series.length - 1];
@@ -405,8 +541,23 @@
       }
     });
 
-    const requiredReboundRate = last.leveragePrice !== 0 ? ((buyPrice / last.leveragePrice) - 1) * 100 : 0;
-    const requiredUnderlyingRebound = leverage !== 0 ? requiredReboundRate / leverage : 0;
+    let requiredReboundRate = 0;
+    let requiredUnderlyingRebound = 0;
+    if (last.leveragePrice > 0 && last.leveragePrice < buyPrice) {
+      requiredReboundRate = ((buyPrice / last.leveragePrice) - 1) * 100;
+
+      // 원금 회복에 필요한 기초자산 수익률을 복리로 역산 (더 정확한 추정)
+      // (1 + r_u * L - f)^n = P_buy / P_last  ==>  1 + r_u * L - f = (P_buy / P_last)^(1/n)
+      // 이 방정식을 풀기 위해, n=1 (하루만에 회복)이라고 가정하고 계산합니다.
+      // (1 + r_u * L - f) = P_buy / P_last
+      // r_u * L = (P_buy / P_last) - 1 + f
+      // r_u = ((P_buy / P_last) - 1 + f) / L
+      if (leverage !== 0) {
+        const targetRatio = buyPrice / last.leveragePrice;
+        requiredUnderlyingRebound = ((targetRatio - 1 + dailyFee) / leverage) * 100;
+      }
+    }
+
     const finalPnl = last.pnl;
     const finalPnlRate = last.pnlRate;
     const isProfit = finalPnl >= 0;
@@ -418,6 +569,7 @@
         <h5 class="report-subtitle">종합 성과 요약</h5>
         <table class="report-table">
           <tr><td>최종 손익 (총 수익률)</td><td class="${isProfit ? 'val-pos' : 'val-neg'}">${finalPnl.toLocaleString('ko-KR', { maximumFractionDigits: 0 })} 원 (${finalPnlRate.toFixed(2)}%)</td></tr>
+          <tr><td>기초자산 원금 회복 필요 수익률</td><td>${requiredUnderlyingRebound > 0 ? `약 ${requiredUnderlyingRebound.toFixed(2)}% 상승 필요` : '이미 회복(또는 초과 수익)'}</td></tr>
           <tr><td>원금 회복에 필요한 레버리지 상승률</td><td>${requiredReboundRate > 0 ? requiredReboundRate.toFixed(2) + '%' : '이미 회복(또는 초과 수익)'}</td></tr>
         </table>
 
@@ -439,9 +591,9 @@
         </table>
 
         <div class="report-narrative">
-          <p><strong>종합 분석:</strong> ${periodDays}일의 투자 기간 동안, 최종 수익률은 <strong>${finalPnlRate.toFixed(2)}%</strong>를 기록했습니다. 위험 대비 성과를 나타내는 샤프 지수는 <strong>${sharpeRatio.toFixed(2)}</strong>로, 감수한 변동성 대비 ${sharpeRatio > 0.5 ? '준수한' : (sharpeRatio > 0 ? '다소 아쉬운' : '부진한')} 성과를 보였습니다.</p>
-          <p><strong>위험 및 변동성:</strong> 투자는 ${mddDay}일차에 <strong>${leverageMDD.toFixed(2)}%</strong>의 최대 낙폭(MDD)을 경험했으며, 이는 투자 기간 중 가장 큰 손실 구간을 의미합니다. 연환산 변동성은 <strong>${(annualizedVolatility * 100).toFixed(2)}%</strong>로, 가격 변동의 폭이 ${annualizedVolatility > 0.4 ? '매우 큰' : (annualizedVolatility > 0.2 ? '상당한' : '비교적 안정적인')} 수준이었음을 보여줍니다. (연간 거래일 252일 기준)</p>
-          <p><strong>레버리지 효과:</strong> 기초자산은 총 <strong>${underlyingCumRate.toFixed(2)}%</strong> ${underlyingCumRate >= 0 ? '상승' : '하락'}했지만, ${leverage}배 레버리지 상품은 <strong>${leverageCumRate.toFixed(2)}%</strong> ${leverageCumRate >= 0 ? '상승' : '하락'}했습니다. 단순 계산 기대치(${ (underlyingCumRate * leverage).toFixed(2)}%)와 실제 수익률의 차이인 '변동성 끌림(Decay)'은 <strong>-${Math.abs(decayGap).toFixed(2)}%p</strong>로 나타났습니다. 이는 일일 복리 계산 방식이 장기 수익률에 미치는 영향을 보여주며, 변동성이 큰 장세일수록 이 효과가 커지는 경향이 있습니다.</p>
+          <p><strong>종합 분석:</strong> ${periodDays}일의 투자 기간 동안, 최종 수익률은 <strong>${finalPnlRate.toFixed(2)}%</strong>를 기록했습니다. 위험 대비 성과를 나타내는 샤프 지수는 <strong>${sharpeRatio.toFixed(2)}</strong>로, 감수한 변동성 대비 ${sharpeRatio > 0.5 ? '준수한' : (sharpeRatio > 0 ? '다소 아쉬운' : '부진한')} 성과를 보였습니다. (연간 거래일 252일 기준)</p>
+          <p><strong>위험 및 변동성:</strong> 투자는 ${mddDay}일차에 <strong>${leverageMDD.toFixed(2)}%</strong>의 최대 낙폭(MDD)을 경험했으며, 이는 투자 기간 중 가장 큰 손실 구간을 의미합니다. 연환산 변동성은 <strong>${(annualizedVolatility * 100).toFixed(2)}%</strong>로, 가격 변동의 폭이 ${annualizedVolatility > 0.4 ? '매우 큰' : (annualizedVolatility > 0.2 ? '상당한' : '비교적 안정적인')} 수준이었음을 보여줍니다.</p>
+          <p><strong>레버리지 효과:</strong> 기초자산은 총 <strong>${underlyingCumRate.toFixed(2)}%</strong> ${underlyingCumRate >= 0 ? '상승' : '하락'}했지만, ${leverage}배 레버리지 상품은 <strong>${leverageCumRate.toFixed(2)}%</strong> ${leverageCumRate >= 0 ? '상승' : '하락'}했습니다. 단순 계산 기대치(${ (underlyingCumRate * leverage).toFixed(2)}%)와 실제 수익률의 차이인 '변동성 끌림(Decay)'은 <strong>-${Math.abs(decayGap).toFixed(2)}%p</strong>로 나타났습니다. 이는 일일 복리 계산 방식이 장기 수익률에 미치는 영향을 보여주며, 변동성이 큰 장세일수록 이 효과가 커지는 경향이 있습니다. 손실이 발생한 경우, 원금 회복을 위해 기초자산은 약 <strong>${requiredUnderlyingRebound.toFixed(2)}%</strong> 상승해야 합니다.</p>
         </div>
       </div>
     `;
@@ -449,6 +601,11 @@
   }
 
   function downloadSimReport() {
+    if (!validateInputs()) {
+      alert('리포트를 다운로드하려면 먼저 유효한 값을 모두 입력해주세요.');
+      return;
+    }
+
     const reportBox = document.getElementById(ID.reportBox);
     if (!reportBox || !reportBox.innerText.trim()) {
       alert('먼저 리포트를 생성해주세요.');
@@ -466,8 +623,15 @@
     URL.revokeObjectURL(url);
   }
 
+  function initSim() {
+    // 저장된 상태가 있으면 불러오고, 없으면 초기화합니다.
+    if (!loadState()) {
+      resetSim();
+    }
+  }
+
   window.lossRecoverySim = {
-    init: resetSim,
+    init: initSim,
     reset: resetSim,
     addRow: addSimRow,
     removeRow: removeSimRow,
